@@ -6,7 +6,7 @@ function(EigenDetermineVSServicePack _pack)
     if(NOT DETERMINED_VS_SERVICE_PACK OR NOT ${_pack})
 
         if(NOT DETERMINED_VS_SERVICE_PACK)
-            _DetermineVSServicePack_CheckVersionWithTryCompile(DETERMINED_VS_SERVICE_PACK _cl_version)
+#            _DetermineVSServicePack_CheckVersionWithTryCompile(DETERMINED_VS_SERVICE_PACK _cl_version)
             if(NOT DETERMINED_VS_SERVICE_PACK)
                 _DetermineVSServicePack_CheckVersionWithTryRun(DETERMINED_VS_SERVICE_PACK _cl_version)
             endif()
