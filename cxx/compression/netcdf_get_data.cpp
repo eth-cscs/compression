@@ -1,13 +1,11 @@
+/*
 #include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
-#include <netcdf_par.h>
-#include <netcdf.h>
 
-#include "mpi.h"
 
 #include <boost/numeric/ublas/io.hpp>
-
+*/
 #if defined(VIENNACL_WITH_OPENCL) || defined(VIENNACL_WITH_OPENMP) || defined(VIENNACL_WITH_CUDA)
 #define VIENNACL
 #include "viennacl/ocl/device.hpp"
@@ -25,6 +23,10 @@
 #include <boost/numeric/ublas/io.hpp>
 #include <boost/numeric/ublas/assignment.hpp> 
 using namespace boost::numeric;
+
+#include "mpi.h"
+#include <netcdf_par.h>
+#include <netcdf.h>
 
 /**
 	   Write description of function here.
