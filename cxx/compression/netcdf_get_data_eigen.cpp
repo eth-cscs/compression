@@ -9,6 +9,9 @@ using namespace Eigen;
 
 #include <boost/numeric/ublas/io.hpp>
 */
+
+#include <random>
+
 #if defined(VIENNACL_WITH_OPENCL) || defined(VIENNACL_WITH_OPENMP) || defined(VIENNACL_WITH_CUDA)
 #define VIENNACL
 #include "viennacl/ocl/device.hpp"
@@ -16,17 +19,14 @@ using namespace Eigen;
 #include "viennacl/scalar.hpp"
 #include "viennacl/vector.hpp"
 #endif
-     
-     /* Handle errors by printing an error message and exiting with a
-      * non-zero status. */
-#define ERRCODE 2
-#define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(ERRCODE);}
 
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/io.hpp>
 #include <boost/numeric/ublas/assignment.hpp> 
 using namespace boost::numeric;
 
+#include "read_timeseries_matrix.h"
+//
 #include "mpi.h"
 
 /**
@@ -42,8 +42,6 @@ using namespace boost::numeric;
 	   @return                    vector of concatenated field values
 	 */
 
-
-#include "read_timeseries_matrix.hpp"
 
 int main(int argc, char *argv[])
 //****************************************************************************80
@@ -186,6 +184,24 @@ int main(int argc, char *argv[])
   
   retval =  0;
   std::cout << "retval " << retval << std::endl;
+
+  //
+  // want vector of length X.rows() of random values between {0,k-1}
+  //
+
+  // create a blank vector of length X.rows()
+  Eigen::VectorXi random_vector(X.rows());
+  // create a uniform distribution function using std::random
+#define K 256
+  std::uniform_int_distribution<int> distribution(0,K-1);
+  //
+  std::default_random_engine engine;
+  auto generator = std::bind(distribution, engine);
+  std::generate_n(random_vector.data(), X.rows(), generator); 
+
+  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", " << ", ";");
+  std::cout << "First 25 random numbers are " << std::endl 
+    << random_vector.block(0,0,25,1).format(CommaInitFmt) << std::endl;
 
 //
 //  Terminate MPI.

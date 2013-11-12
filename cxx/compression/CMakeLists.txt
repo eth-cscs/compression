@@ -38,12 +38,14 @@ include_directories(${Boost_INCLUDE_DIRS})
 #--------------------------------------------------
 find_package(ViennaCL NO_MODULE PATHS ${CMAKE_CURRENT_BINARY_DIR}/../ViennaCL)
 #message("ViennaCL_FOUND is ${ViennaCL_FOUND}")
-add_definitions(-DVIENNACL_WITH_OPENCL)
+#add_definitions(-DVIENNACL_WITH_OPENCL)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../eigen)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../viennaCL)
 
+add_definitions(-DUSE_PARALLEL)
 
 set(COMPRESSION_SRC_FILES
-  netcdf_get_data.cpp
+  netcdf_get_data_eigen.cpp 
 )
 
 add_executable(getdata 

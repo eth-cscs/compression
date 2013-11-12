@@ -12,7 +12,10 @@ option(BUILD_TESTING OFF)
 if(BUILD_TESTING)
   enable_testing()
   option(ENABLE_EIGEN_TESTING OFF)
+  option(ENABLE_VIENNACL_TESTING OFF)
 endif()
+
+option(ENABLE_VIENNACL_EXAMPLES OFF)
 
 #--------------------------------------------------
 # Add Eigen sub project

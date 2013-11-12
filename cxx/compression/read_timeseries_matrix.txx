@@ -1,14 +1,3 @@
-     /* Handle errors by printing an error message and exiting with a
-      * non-zero status. */
-#define ERRCODE 2
-#define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(ERRCODE);}
-
-#include "mpi.h"
-#include <netcdf_par.h>
-#include <netcdf.h>
-#include <Eigen/Dense>
-using namespace Eigen;
-
 /**
 	   Write description of function here.
 	   The function should follow these comments.
@@ -22,6 +11,10 @@ using namespace Eigen;
 	   @return                    vector of concatenated field values
 	 */
 
+     /* Handle errors by printing an error message and exiting with a
+      * non-zero status. */
+#define ERRCODE 2
+#define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(ERRCODE);}
 
 template <typename ScalarType>
 Matrix<ScalarType,Dynamic,Dynamic> read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields )

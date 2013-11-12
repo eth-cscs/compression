@@ -49,11 +49,11 @@ ENDIF()
 # Subdirectories
 ################
 
-if(BUILD_EXAMPLES)
+if(ENABLE_VIENNACL_EXAMPLES)
    add_subdirectory(examples)
 endif()
 
-if(BUILD_TESTING)
+if(ENABLE_VIENNACL_TESTING)
    add_subdirectory(tests)
 endif()
 
