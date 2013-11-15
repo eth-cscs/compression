@@ -26,6 +26,8 @@ using namespace Eigen;
 using namespace boost::numeric;
 
 #include "read_timeseries_matrix.h"
+#include "gamma_zero.h"
+#include "theta_s.h"
 //
 #include "mpi.h"
 
@@ -175,37 +177,38 @@ int main(int argc, char *argv[])
   std::string              filename(argv[1]);
   std::vector<std::string> fields(argv+2, argv+argc);
 
-  Eigen::Matrix<ScalarType,Dynamic,Dynamic>      X = read_timeseries_matrix<ScalarType>( filename, fields);
-  VectorXd                                       b = VectorXd::Random(X.cols());
-  VectorXd                                       Xb = X * b;
+  typedef Matrix<ScalarType, Dynamic, Dynamic> MatrixX;
+  typedef Array<int, Dynamic, 1> ArrayX1i;
 
+  MatrixX   X = read_timeseries_matrix<ScalarType>( filename, fields);
+
+  /*
+  VectorXd  b = VectorXd::Random(X.cols());
+  VectorXd  Xb = X * b;
   std::cout << "matrix rows " << X.rows() << " cols " << X.cols() << std::endl;
   std::cout << "norm rand vect " << b.norm() << " norm matrix * random vector " << Xb.norm() << std::endl;
+  */
   
-  retval =  0;
-  std::cout << "retval " << retval << std::endl;
-
   //
   // want vector of length X.rows() of random values between {0,k-1}
   //
 
+#define K 10
+
   // create a blank vector of length X.rows()
-  Eigen::VectorXi random_vector(X.rows());
-  // create a uniform distribution function using std::random
-#define K 256
-  std::uniform_int_distribution<int> distribution(0,K-1);
-  //
-  std::default_random_engine engine;
-  auto generator = std::bind(distribution, engine);
-  std::generate_n(random_vector.data(), X.rows(), generator); 
+  ArrayX1i gamma_ind = gamma_zero( X.cols(), K );
+  MatrixX  theta = theta_s<ScalarType>( gamma_ind, X, K);
 
   IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", " << ", ";");
   std::cout << "First 25 random numbers are " << std::endl 
-    << random_vector.block(0,0,25,1).format(CommaInitFmt) << std::endl;
+    << gamma_ind.block(0,0,25,1).format(CommaInitFmt) << std::endl;
 
 //
 //  Terminate MPI.
 //
+  retval =  0;
+  std::cout << "retval " << retval << std::endl;
+
   MPI::Finalize ( );
 
   return 0;
