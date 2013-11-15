@@ -11,6 +11,7 @@ using namespace Eigen;
 */
 
 #include <random>
+#include <algorithm>
 
 #if defined(VIENNACL_WITH_OPENCL) || defined(VIENNACL_WITH_OPENMP) || defined(VIENNACL_WITH_CUDA)
 #define VIENNACL
@@ -43,6 +44,8 @@ using namespace boost::numeric;
 	   @param[in]     fields      List of the fields to be extracted (vector of strings0
 	   @return                    vector of concatenated field values
 	 */
+
+
 
 
 int main(int argc, char *argv[])
@@ -196,12 +199,38 @@ int main(int argc, char *argv[])
 #define K 10
 
   // create a blank vector of length X.rows()
-  ArrayX1i gamma_ind = gamma_zero( X.cols(), K );
+  ArrayX1i gamma_ind = gamma_zero( static_cast<int>(X.cols()), K );
   MatrixX  theta = theta_s<ScalarType>( gamma_ind, X, K);
 
   IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", " << ", ";");
   std::cout << "First 25 random numbers are " << std::endl 
     << gamma_ind.block(0,0,25,1).format(CommaInitFmt) << std::endl;
+
+
+//  auto result1 = std::find_if(gamma_ind.data(), gamma_ind.data()+gamma_ind.rows(), std::bind2nd (std::equal_to<int>(), 4));
+//  std::cout << "result of find operation is " << std::endl 
+//    << result1.format(CommaInitFmt) << std::endl;
+
+
+  const int match = 4;
+  std::vector<int> found_items;
+  for (int i=0; i<gamma_ind.rows(); i++) {
+    if (gamma_ind[i] == match) { found_items.push_back(i); }
+  }
+
+  copy(found_items.begin(), found_items.end(), ostream_iterator<int>(cout, ", "));
+
+/*
+  std::for_each(gamma_ind.data(), gamma_ind.data()+gamma_ind.rows(),
+
+               [&match, &found_items, &gamma_ind](int *entry) mutable
+               {
+                 if( *entry == match)
+                 { 
+                   found_items.push_back(static_cast<int>(entry-gamma_ind.data())); 
+                 }
+               } );
+*/
 
 //
 //  Terminate MPI.
