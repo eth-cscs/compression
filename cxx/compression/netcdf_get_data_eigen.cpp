@@ -28,8 +28,10 @@ using namespace boost::numeric;
 
 #include "read_timeseries_matrix.h"
 #include "gamma_zero.h"
+#include "find.h"
 #include "theta_s.h"
 //
+
 #include "mpi.h"
 
 /**
@@ -180,10 +182,10 @@ int main(int argc, char *argv[])
   std::string              filename(argv[1]);
   std::vector<std::string> fields(argv+2, argv+argc);
 
-  typedef Matrix<ScalarType, Dynamic, Dynamic> MatrixX;
+  typedef Matrix<ScalarType, Dynamic, Dynamic> MatrixXX;
   typedef Array<int, Dynamic, 1> ArrayX1i;
 
-  MatrixX   X = read_timeseries_matrix<ScalarType>( filename, fields);
+  MatrixXX   X = read_timeseries_matrix<ScalarType>( filename, fields);
 
   /*
   VectorXd  b = VectorXd::Random(X.cols());
@@ -200,37 +202,22 @@ int main(int argc, char *argv[])
 
   // create a blank vector of length X.rows()
   ArrayX1i gamma_ind = gamma_zero( static_cast<int>(X.cols()), K );
-  MatrixX  theta = theta_s<ScalarType>( gamma_ind, X, K);
 
-  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", " << ", ";");
-  std::cout << "First 25 random numbers are " << std::endl 
-    << gamma_ind.block(0,0,25,1).format(CommaInitFmt) << std::endl;
+  //  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", " << ", ";");
+  //  std::cout << "First 25 random numbers are " << std::endl 
+  //  << gamma_ind.block(0,0,25,1).format(CommaInitFmt) << std::endl;
 
+  //  MatrixX  theta = theta_s<ScalarType>( gamma_ind, X, K);
 
 //  auto result1 = std::find_if(gamma_ind.data(), gamma_ind.data()+gamma_ind.rows(), std::bind2nd (std::equal_to<int>(), 4));
 //  std::cout << "result of find operation is " << std::endl 
 //    << result1.format(CommaInitFmt) << std::endl;
 
-
-  const int match = 4;
-  std::vector<int> found_items;
-  for (int i=0; i<gamma_ind.rows(); i++) {
-    if (gamma_ind[i] == match) { found_items.push_back(i); }
-  }
+  std::vector<int> found_items = find( gamma_ind, 4 );
 
   copy(found_items.begin(), found_items.end(), ostream_iterator<int>(cout, ", "));
 
-/*
-  std::for_each(gamma_ind.data(), gamma_ind.data()+gamma_ind.rows(),
-
-               [&match, &found_items, &gamma_ind](int *entry) mutable
-               {
-                 if( *entry == match)
-                 { 
-                   found_items.push_back(static_cast<int>(entry-gamma_ind.data())); 
-                 }
-               } );
-*/
+  MatrixXX Theta = theta_s( gamma_ind, X, K );
 
 //
 //  Terminate MPI.
