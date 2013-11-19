@@ -14,28 +14,24 @@
 template <typename ScalarType>
 Matrix<ScalarType, Dynamic, Dynamic> theta_s(const ArrayX1i gamma_ind, const Matrix<ScalarType, Dynamic, Dynamic> X, const int K)
 {
-  const int nj = X.cols();
+  const int nl = X.cols();
 
-  ArrayX1i sum_gamma(K);   // Number of entries containing each index
-  for(int k = 0; k < K; k++) 
-  { sum_gamma[k] = (gamma_ind == k).count();   
-    std::cout << "sum_gamma[ " << k << "] = " << sum_gamma[k] << std::endl;
-    }
-
-  Matrix<ScalarType,Dynamic,Dynamic> theta_update( X.rows(), K) ;
-
-/*  
-  MatrixX colnorm( X.cols(), K ) ;
-
-  for(int i = 0; i < K; i++)
+  Matrix<ScalarType, Dynamic, Dynamic> output = Matrix<ScalarType, Dynamic, Dynamic>::Zero(X.rows(),K); 
+  ScalarType sum_gamma;   // Number of entries containing each index
+  // This loop is parallel: No dependencies between the columns
+  for(int k = 0; k < K; k++)
+  { 
+    sum_gamma = static_cast<ScalarType> ((gamma_ind == k).count());
+    std::vector<int> found_items = find( gamma_ind, k );
+    if ( sum_gamma > 0 )
     {
-// This loop can be multithreaded!
-      for(int j = 0; j < nj; j++) { Xtranslated.col(j) = X.col(j) - TT.col(i); }  // translate each column of X
-      Xtranslated -= TT.col(i) * ( TT.transpose().row(i) * Xtranslated );
-      for(int j = 0; j < nj; j++) { colnorm.col(j) = Xtr.col(j).norm(); }  // translate each column of X
+      for (int m = 0; m < found_items.size() ; m++ ) 
+      {
+         output.col(k) += X.col(found_items[m]); 
+      }
+      output.col(k) /= sum_gamma;
     }
-  // [val GammaInd]=min(colnorm,[],2);
-*/
+  }
 
-  return theta_update;
+  return output;
 }
