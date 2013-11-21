@@ -14,7 +14,7 @@
 	 */
 
 template <typename ScalarType>
-void theta_s(const ArrayX1i gamma_ind, const MatrixXX X, MatrixXX theta )
+void theta_s(const ArrayX1i &gamma_ind, const MatrixXX &X, MatrixXX &theta )
 {
   const int nl = X.cols();
 
