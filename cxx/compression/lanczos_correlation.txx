@@ -12,15 +12,11 @@
 	 */
 
 template <typename ScalarType>
-Matrix<ScalarType, Dynamic, Dynamic> lanczos_correlation(const Matrix<ScalarType, Dynamic, Dynamic> Xtranslated, const int nbr_eig, const ScalarType tol, const int max_iter)
+void lanczos_correlation(const MatrixXX &Xtranslated, const int nbr_eig, const ScalarType tol, const int max_iter, MatrixXX &EV)
 {
-  typedef Matrix<ScalarType, Dynamic, Dynamic> MatrixXX;
-  typedef Matrix<ScalarType, Dynamic, 1> VectorX;
-
   int nrows = Xtranslated.rows();
   ScalarType gamma, delta;
   
-  MatrixXX EV = MatrixXX::Zero(nrows,nbr_eig);   // output
   MatrixXX V  = MatrixXX::Zero(nrows,max_iter);  // transformation
   MatrixXX Trid  = MatrixXX::Zero(max_iter,max_iter);  // Tridiagonal
   
@@ -42,7 +38,7 @@ Matrix<ScalarType, Dynamic, Dynamic> lanczos_correlation(const Matrix<ScalarType
 
     // reorthogonalize  -- this can be an argument-driven option
     for( int sub_iter = 0; sub_iter < iter; sub_iter++ )  {
-      crap = V.col(iter).transpose()*V.col(sub_iter);
+      ScalarType crap = V.col(iter).transpose()*V.col(sub_iter);
       V.col(iter) -= crap*V.col(sub_iter);
       //      V.col(iter) -= (V.col(iter).transpose()*V.col(sub_iter))*V.col(sub_iter);  // run-time crash... Why?
     }
@@ -61,13 +57,12 @@ Matrix<ScalarType, Dynamic, Dynamic> lanczos_correlation(const Matrix<ScalarType
       for (int count = 0; count < nbr_eig; count++) {      // Go through the Ritz values of interest
         ScalarType this_eig = eigs(count+iter-nbr_eig+1);  // Now determine the associated relative error
 	max_err = max( abs(((Xtranslated*(Xtranslated.transpose()*EV.col(count)) - EV.col(count)*this_eig).norm())/this_eig), max_err);
-	cout << " Ritz value of interest " << this_eig << endl; 
       }
-      cout << "The maximum error is : " << max_err << endl;
-      if ( max_err < tol ) break; 
+      if ( max_err < tol ) {
+        cout << "The maximum error is : " << max_err << " after " << iter << " iterations" << endl;
+	break;
+      }
     }
 
   }
-
-  return EV;
 }

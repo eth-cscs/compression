@@ -1,7 +1,8 @@
 #include <Eigen/Dense>
 using namespace Eigen;
+using namespace std;
 
 template <typename ScalarType>
-Matrix<ScalarType, Dynamic, Dynamic> lanczos_correlation(const Matrix<ScalarType, Dynamic, Dynamic> Xtranslated, const int nbr_eig, const ScalarType tol );
+void lanczos_correlation(const MatrixXX &Xtranslated, const int nbr_eig, const ScalarType tol, const int max_iter, MatrixXX &EV );
 
 #include "lanczos_correlation.txx"

@@ -31,8 +31,11 @@ using namespace boost::numeric;
 #include "usi_compression.h"
 #include "read_timeseries_matrix.h"
 #include "gamma_zero.h"
+#include "gamma_s.h"
 #include "find.h"
 #include "theta_s.h"
+#include "lanczos_correlation.h"
+#include "L_value.h"
 //
 
 #include "mpi.h"
@@ -202,11 +205,28 @@ int main(int argc, char *argv[])
 #define K 10
 
   // create a blank vector of length X.rows()
-  ArrayX1i gamma_ind = gamma_zero( static_cast<int>(X.cols()), K );
-  MatrixXX theta = MatrixXX::Zero(X.rows(),K);       // Allocate outside loop
+  const int Ntl = static_cast<int>(X.rows());
+  const int nl = static_cast<int>(X.cols());
+  ArrayX1i gamma_ind = gamma_zero(nl, K );
+  MatrixXX theta = MatrixXX::Zero(Ntl,K);       // Time series means (one for each k), allocate outside loop
+  MatrixXX TT(Ntl,K);                 // Eigenvectors (one for each k), allocate outside loop
+  MatrixXX Xtranslatedfull( Ntl, nl ) ;
+  MatrixXX eigenvectors( Ntl, 1 ) ;   // Only one eigenvector at this stage
 
   for ( int iter = 0; iter < MAX_ITER; iter++ ) {
-    theta_s<ScalarType>(gamma_ind, X, theta);
+    theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
+    for(int k = 0; k < theta.cols(); k++) {
+      std::vector<int> Nonzeros = find( gamma_ind, k );
+      MatrixXX Xtranslated(X.rows(),Nonzeros.size());    // Partition subset for this K
+      for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
+      {
+	Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
+      }
+      lanczos_correlation(Xtranslated, 1, 1.0e-9, 20, eigenvectors);
+      TT.col(k) = eigenvectors.col(0);
+    }
+    gamma_s( X, theta, TT, gamma_ind );
+    std::cout << "L value is " << L_value( gamma_ind, TT, X, theta ) << std::endl;
   }
 
 
@@ -214,9 +234,15 @@ int main(int argc, char *argv[])
 //  std::cout << "result of find operation is " << std::endl 
 //    << result1.format(CommaInitFmt) << std::endl;
 
-  std::vector<int> found_items = find( gamma_ind, 4 );
+/*
+  for(int k = 0; k < theta.cols(); k++) {
+    std::cout << "index set for k =  " << k << std::endl ;
+    std::vector<int> found_items = find( gamma_ind, k );
 
-  copy(found_items.begin(), found_items.end(), ostream_iterator<int>(cout, ", "));
+    copy(found_items.begin(), found_items.end(), ostream_iterator<int>(cout, ", "));
+    std::cout << std::endl ;
+  }
+*/
 
 //
 //  Terminate MPI.

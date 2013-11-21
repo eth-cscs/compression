@@ -7,5 +7,6 @@ using namespace Eigen;
 typedef double ScalarType;     // feel free to change this to 'double' if supported by your hardware
 
 typedef Matrix<ScalarType, Dynamic, Dynamic> MatrixXX;
+typedef Matrix<ScalarType, Dynamic, 1> VectorX;
 
 #endif

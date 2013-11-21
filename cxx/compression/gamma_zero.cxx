@@ -11,15 +11,15 @@
 	   @return                    vector of concatenated field values
 	 */
 
-ArrayX1i gamma_zero(const int Ntl, const int K )
+ArrayX1i gamma_zero(const int nl, const int K )
 {
-  ArrayX1i random_vector(Ntl);
+  ArrayX1i random_vector(nl);
 
   std::uniform_int_distribution<int> distribution(0,K-1);
   //
   std::default_random_engine engine;
   auto generator = std::bind(distribution, engine);
-  std::generate_n(random_vector.data(), Ntl, generator); 
+  std::generate_n(random_vector.data(), nl, generator); 
 
   //  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", " << ", ";");
   //  std::cout << "First 25 random numbers are " << std::endl 

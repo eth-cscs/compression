@@ -20,7 +20,7 @@ void theta_s(const ArrayX1i &gamma_ind, const MatrixXX &X, MatrixXX &theta )
 
   ScalarType sum_gamma;   // Number of entries containing each index
   // This loop is parallel: No dependencies between the columns
-  for(int k = 0; k < (theta).cols(); k++)
+  for(int k = 0; k < theta.cols(); k++)
   { 
     theta.setZero();  // Sums should start from zero
     sum_gamma = static_cast<ScalarType> ((gamma_ind == k).count());
