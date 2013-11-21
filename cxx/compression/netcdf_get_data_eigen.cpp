@@ -10,6 +10,8 @@ using namespace Eigen;
 #include <boost/numeric/ublas/io.hpp>
 */
 
+#define MAX_ITER 10
+
 #include <random>
 #include <algorithm>
 
@@ -202,12 +204,12 @@ int main(int argc, char *argv[])
 
   // create a blank vector of length X.rows()
   ArrayX1i gamma_ind = gamma_zero( static_cast<int>(X.cols()), K );
+  MatrixXX theta = MatrixXX::Zero(X.rows(),K);       // Allocate outside loop
 
-  //  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", " << ", ";");
-  //  std::cout << "First 25 random numbers are " << std::endl 
-  //  << gamma_ind.block(0,0,25,1).format(CommaInitFmt) << std::endl;
+  for ( int iter = 0; iter < MAX_ITER; iter++ ) {
+    theta_s<ScalarType>(gamma_ind, X, &theta);
+  }
 
-  //  MatrixX  theta = theta_s<ScalarType>( gamma_ind, X, K);
 
 //  auto result1 = std::find_if(gamma_ind.data(), gamma_ind.data()+gamma_ind.rows(), std::bind2nd (std::equal_to<int>(), 4));
 //  std::cout << "result of find operation is " << std::endl 
@@ -216,8 +218,6 @@ int main(int argc, char *argv[])
   std::vector<int> found_items = find( gamma_ind, 4 );
 
   copy(found_items.begin(), found_items.end(), ostream_iterator<int>(cout, ", "));
-
-  MatrixXX Theta = theta_s( gamma_ind, X, K );
 
 //
 //  Terminate MPI.
