@@ -9,6 +9,6 @@
 using namespace Eigen;
 //
 template <typename ScalarType>
-Matrix<ScalarType,Dynamic,Dynamic> read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields );
+MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields );
 
 #include "read_timeseries_matrix.txx"

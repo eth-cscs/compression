@@ -14,24 +14,24 @@
 	 */
 
 template <typename ScalarType>
-void theta_s(const ArrayX1i gamma_ind, const Matrix<ScalarType, Dynamic, Dynamic> X, Matrix<ScalarType, Dynamic, Dynamic>* theta )
+void theta_s(const ArrayX1i gamma_ind, const MatrixXX X, MatrixXX theta )
 {
   const int nl = X.cols();
 
   ScalarType sum_gamma;   // Number of entries containing each index
   // This loop is parallel: No dependencies between the columns
-  for(int k = 0; k < (*theta).cols(); k++)
+  for(int k = 0; k < (theta).cols(); k++)
   { 
-    *theta = Matrix<ScalarType, Dynamic, Dynamic>::Zero;  // Sums should start from zero
+    theta.setZero();  // Sums should start from zero
     sum_gamma = static_cast<ScalarType> ((gamma_ind == k).count());
     std::vector<int> found_items = find( gamma_ind, k );
     if ( sum_gamma > 0 )
     {
       for (int m = 0; m < found_items.size() ; m++ ) 
       {
-         *theta.col(k) += X.col(found_items[m]); 
+         theta.col(k) += X.col(found_items[m]); 
       }
-      *theta.col(k) /= sum_gamma;
+      theta.col(k) /= sum_gamma;
     }
   }
 }

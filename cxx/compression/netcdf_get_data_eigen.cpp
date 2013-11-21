@@ -28,6 +28,7 @@ using namespace Eigen;
 #include <boost/numeric/ublas/assignment.hpp> 
 using namespace boost::numeric;
 
+#include "usi_compression.h"
 #include "read_timeseries_matrix.h"
 #include "gamma_zero.h"
 #include "find.h"
@@ -95,7 +96,6 @@ int main(int argc, char *argv[])
 {
   using namespace std;
 
-  typedef double               ScalarType;     //feel free to change this to 'double' if supported by your hardware
 
   /* This will be the netCDF ID for the file and data variable. */
   int ncid, varid, dimid;
@@ -184,7 +184,6 @@ int main(int argc, char *argv[])
   std::string              filename(argv[1]);
   std::vector<std::string> fields(argv+2, argv+argc);
 
-  typedef Matrix<ScalarType, Dynamic, Dynamic> MatrixXX;
   typedef Array<int, Dynamic, 1> ArrayX1i;
 
   MatrixXX   X = read_timeseries_matrix<ScalarType>( filename, fields);
@@ -207,7 +206,7 @@ int main(int argc, char *argv[])
   MatrixXX theta = MatrixXX::Zero(X.rows(),K);       // Allocate outside loop
 
   for ( int iter = 0; iter < MAX_ITER; iter++ ) {
-    theta_s<ScalarType>(gamma_ind, X, &theta);
+    theta_s<ScalarType>(gamma_ind, X, theta);
   }
 
 

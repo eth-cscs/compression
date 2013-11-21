@@ -17,7 +17,7 @@
 #define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(ERRCODE);}
 
 template <typename ScalarType>
-Matrix<ScalarType,Dynamic,Dynamic> read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields )
+MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields )
 {
   int ncid, varid;
   int ndims;
@@ -91,7 +91,7 @@ Matrix<ScalarType,Dynamic,Dynamic> read_timeseries_matrix(const std::string file
 
   //  std::vector<ScalarType> output(data, data+slab_size);
 
-  typedef Matrix<ScalarType, Dynamic, Dynamic> MatrixX;
+  typedef MatrixXX MatrixX;
 
   
   int dim1, dim2;
