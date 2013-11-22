@@ -210,23 +210,25 @@ int main(int argc, char *argv[])
   ArrayX1i gamma_ind = gamma_zero(nl, K );
   MatrixXX theta = MatrixXX::Zero(Ntl,K);       // Time series means (one for each k), allocate outside loop
   MatrixXX TT(Ntl,K);                 // Eigenvectors (one for each k), allocate outside loop
-  MatrixXX Xtranslatedfull( Ntl, nl ) ;
+  MatrixXX Xtranslated( Ntl, nl ) ;   // Maximum size for worst case (all nl in one K)
   MatrixXX eigenvectors( Ntl, 1 ) ;   // Only one eigenvector at this stage
 
   for ( int iter = 0; iter < MAX_ITER; iter++ ) {
     theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
-    for(int k = 0; k < theta.cols(); k++) {
+    if ( iter > 0 ) { std::cout << "L value after theta determination " << L_value( gamma_ind, TT, X, theta ) << std::endl; }
+    for(int k = 0; k < K; k++) {              // Principle Component Analysis
       std::vector<int> Nonzeros = find( gamma_ind, k );
-      MatrixXX Xtranslated(X.rows(),Nonzeros.size());    // Partition subset for this K
+      std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
       for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
       {
 	Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
       }
-      lanczos_correlation(Xtranslated, 1, 1.0e-9, 20, eigenvectors);
+      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-3, 20, eigenvectors);
       TT.col(k) = eigenvectors.col(0);
     }
+    std::cout << "L value after PCA " << L_value( gamma_ind, TT, X, theta ) << std::endl;
     gamma_s( X, theta, TT, gamma_ind );
-    std::cout << "L value is " << L_value( gamma_ind, TT, X, theta ) << std::endl;
+    std::cout << "L value after gamma minimization " << L_value( gamma_ind, TT, X, theta ) << std::endl;
   }
 
 
