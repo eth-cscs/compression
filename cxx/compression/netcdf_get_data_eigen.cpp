@@ -239,7 +239,7 @@ int main(int argc, char *argv[])
       std::cout << "New L_value " << L_value_new << " larger than old: " << L_value_new << " aborting " << std::endl;
       break;
     }
-    else if ( L_value_old - L_value_new < TOL ) {
+    else if ( (L_value_old - L_value_new) < L_value_new*TOL ) {
       std::cout << " Converged: to tolerance " << TOL << std::endl;
       break;
     }
