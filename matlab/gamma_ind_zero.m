@@ -2,7 +2,7 @@
 % Matlab code for determining the new gamma probabilities
 
 % Code available from: http://www.cs.cmu.edu/~bickson/gabp/
-function [GammaInd] = gamma_ind_zero(Nt,K)
+function [GammaInd] = gamma_ind_zero(nl,K)
 
 %
 %  Determine a random $\gamma \in \Re^{Nt \times K}$ with
@@ -17,6 +17,12 @@ function [GammaInd] = gamma_ind_zero(Nt,K)
 %  index vector
 %
 
-GammaInd  = randi(K,Nt,1);
+% RANDOM VARIANT:  GammaInd  = randi(K,nl,1);
+
+for m=1:48
+for l=m:48:nl
+   GammaInd(l) = mod((l-1),K) + 1;   % One-based indices
+end
+end
 
 end

@@ -113,7 +113,6 @@ else
 end
 
 X=reshape(data,datasize(1)*datasize(2),n);    %  see help squeeze to remove singleton dims
-Xsize = size(X)
 
 clear rel_err compr_factor rel com compr_factor_stat idx
  
@@ -121,6 +120,8 @@ clear rel_err compr_factor rel com compr_factor_stat idx
 %%%save -ascii X Xd
 X = X';   % use the transpose to better correspond to old code.
 [Ntl,nl]=size(X)
+
+X(:,1:48:240)
 
 EV = zeros(Ntl,m,K);
 
@@ -135,10 +136,8 @@ for ind_tol=1:length(tol)
         Theta = theta_ind_s(GammaInd, X, K);
         for i=1:K
             Nonzeros = find(GammaInd==i);
-            K_and_nbrnonzeros = [ i size(find(GammaInd==i)) ]
-        
             Xtr = bsxfun(@minus,X(:,Nonzeros),Theta(:,i));
-            [TT(:,i),j,flag] = lanczos_elman_ind(Xtr,i,1,1e-3,20,0);
+            [TT(:,i),j,flag] = lanczos_elman_ind(Xtr,i,1,1e-5,20,0);
         end
         LafterTT = L_value_ind(GammaInd, TT, X, Theta)
         GammaInd = gamma_ind_s(X,Theta,TT);
@@ -154,7 +153,6 @@ for ind_tol=1:length(tol)
         Nonzeros = find(GammaInd==i);
         Xtr = bsxfun(@minus,X(:,Nonzeros),Theta(:,i)); % Theta is new origin
         [EV(:,:,i),j,flag] = lanczos_elman_ind(Xtr,i,m,ind_tol,100,0);
-        Iterations = j
     end
     Lfinal = L_value_mlarge_ind(GammaInd, EV, X, Theta)
 end
