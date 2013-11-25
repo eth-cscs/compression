@@ -10,7 +10,8 @@ using namespace Eigen;
 #include <boost/numeric/ublas/io.hpp>
 */
 
-#define MAX_ITER 10
+#define MAX_ITER 100
+#define TOL 1.0e-3
 
 #include <random>
 #include <algorithm>
@@ -109,7 +110,6 @@ int main(int argc, char *argv[])
   int x, y, retval ;
   int slab_size ; // is the number of entries in one slab to be read in
 
-  double *data_double;
   int    *dimids;
   size_t *dims;
   size_t *p;
@@ -191,6 +191,8 @@ int main(int argc, char *argv[])
 
   MatrixXX   X = read_timeseries_matrix<ScalarType>( filename, fields);
 
+
+
   /*
   VectorXd  b = VectorXd::Random(X.cols());
   VectorXd  Xb = X * b;
@@ -207,30 +209,42 @@ int main(int argc, char *argv[])
   // create a blank vector of length X.rows()
   const int Ntl = static_cast<int>(X.rows());
   const int nl = static_cast<int>(X.cols());
+  // std::cout << "First row X " << X.block(0,0,Ntl,5) << std::endl;
   ArrayX1i gamma_ind = gamma_zero(nl, K );
   MatrixXX theta = MatrixXX::Zero(Ntl,K);       // Time series means (one for each k), allocate outside loop
   MatrixXX TT(Ntl,K);                 // Eigenvectors (one for each k), allocate outside loop
   MatrixXX Xtranslated( Ntl, nl ) ;   // Maximum size for worst case (all nl in one K)
   MatrixXX eigenvectors( Ntl, 1 ) ;   // Only one eigenvector at this stage
 
+  ScalarType L_value_old = 1.0e19;   // Very big value
+  ScalarType L_value_new;  
   for ( int iter = 0; iter < MAX_ITER; iter++ ) {
     theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
-    if ( iter > 0 ) { std::cout << "L value after theta determination " << L_value( gamma_ind, TT, X, theta ) << std::endl; }
+    // if ( iter > 0 ) { std::cout << "L value after theta determination " << L_value( gamma_ind, TT, X, theta ) << std::endl; }
     for(int k = 0; k < K; k++) {              // Principle Component Analysis
       std::vector<int> Nonzeros = find( gamma_ind, k );
-      std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
+      //      std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
       for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
       {
 	Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
       }
-      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-3, 20, eigenvectors);
+      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-7, 20, eigenvectors);
       TT.col(k) = eigenvectors.col(0);
     }
     std::cout << "L value after PCA " << L_value( gamma_ind, TT, X, theta ) << std::endl;
     gamma_s( X, theta, TT, gamma_ind );
-    std::cout << "L value after gamma minimization " << L_value( gamma_ind, TT, X, theta ) << std::endl;
+    L_value_new =  L_value( gamma_ind, TT, X, theta ); 
+    std::cout << "L value after gamma minimization " << L_value_new << std::endl;
+    if ( L_value_new > L_value_old ) { 
+      std::cout << "New L_value " << L_value_new << " larger than old: " << L_value_new << " aborting " << std::endl;
+      break;
+    }
+    else if ( L_value_old - L_value_new < TOL ) {
+      std::cout << " Converged: to tolerance " << TOL << std::endl;
+      break;
+    }
+    L_value_old = L_value_new;
   }
-
 
 //  auto result1 = std::find_if(gamma_ind.data(), gamma_ind.data()+gamma_ind.rows(), std::bind2nd (std::equal_to<int>(), 4));
 //  std::cout << "result of find operation is " << std::endl 

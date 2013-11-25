@@ -1,25 +1,18 @@
 /**
-	   Write description of function here.
-	   The function should follow these comments.
-	   Use of "brief" tag is optional. (no point to it)
-	   
-	   The function arguments listed with "param" will be compared
-	   to the declaration and verified.
-	 
-	   @param[in]     filename    Filename (string)
-	   @param[in]     fields      List of the fields to be extracted (vector of strings0
-	   @return                    vector of concatenated field values
+	   Initialize gamma.  In this case there is a non-random step pattern:
+           
+	   @param[in]     nl          Number of local points in horizontal (int)
+	   @param[in]     K           Subspace size
+	   @return                    Array containing indices of probability 1
 	 */
 
 ArrayX1i gamma_zero(const int nl, const int K )
 {
   ArrayX1i random_vector(nl);
 
-  std::uniform_int_distribution<int> distribution(0,K-1);
-  //
-  std::default_random_engine engine;
-  auto generator = std::bind(distribution, engine);
-  std::generate_n(random_vector.data(), nl, generator); 
+  for ( int l=0; l < nl ; l++ ) {
+    random_vector(l) = l%K;
+  }
 
   //  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", " << ", ";");
   //  std::cout << "First 25 random numbers are " << std::endl 

@@ -23,14 +23,15 @@ void theta_s(const ArrayX1i &gamma_ind, const MatrixXX &X, MatrixXX &theta )
   for(int k = 0; k < K; k++) { 
     std::vector<int> Nonzeros = find( gamma_ind, k );
     sum_gamma = static_cast<ScalarType> (Nonzeros.size());
-    std::cout << "k " << k << " nonzeros " << sum_gamma << std::endl;
+    // std::cout << "k " << k << " nonzeros " << sum_gamma << " " << Nonzeros[0] << " " << Nonzeros[1] << " " << Nonzeros[2] << std::endl;
     if ( sum_gamma > 0 ) {
+      //  std::cout << "Norm of first X column " << X.col(Nonzeros[0]).norm() << std::endl;
       theta.col(k) = X.col(Nonzeros[0]); 
       for (int m = 1; m < Nonzeros.size() ; m++ ) {
         theta.col(k) += X.col(Nonzeros[m]); 
       }
       theta.col(k) /= sum_gamma;
-      std::cout << "Norm of theta column(" << k << ")= " << theta.col(k).norm() << std::endl;
+      // std::cout << "Norm of theta column(" << k << ")= " << theta.col(k).norm() << std::endl;
     }
   }
 }

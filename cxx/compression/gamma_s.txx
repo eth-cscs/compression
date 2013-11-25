@@ -17,18 +17,18 @@ void gamma_s( const MatrixXX &X, const MatrixXX &theta, const MatrixXX &TT, Arra
   MatrixXX Xtranslated( Ntl, nl ) ;
   MatrixXX colnorm( nl, K ) ;
 
-  std::cout << "TT rows " << TT.rows() << " cols " << TT.cols() << std::endl;
+//  std::cout << "TT rows " << TT.rows() << " cols " << TT.cols() << std::endl;
 
 // This loop can be multithreaded, if all threads have a separate copy of Xtranslated
   for(int k = 0; k < K; k++) {
 // This loop can be multithreaded!
-    for(int l = 0; l < nl; l++) { Xtranslated.col(l) = X.col(l) - TT.col(k); }  // translate each column of X
+    for(int l = 0; l < nl; l++) { Xtranslated.col(l) = X.col(l) - theta.col(k); }  // translate each column of X
     Xtranslated -= TT.col(k) * ( TT.col(k).transpose() * Xtranslated );
 // This loop can be multithreaded!
     for(int l = 0; l < nl; l++) { colnorm(l,k) = Xtranslated.col(l).norm(); }  // translate each column of X
   }
 
-   std::cout << "row 1 of colnorm is " << colnorm.row(1) << " rows " << colnorm.rows() << " cols " << colnorm.cols() << std::endl;
+//   std::cout << "row 1 of colnorm is " << colnorm.row(1) << " rows " << colnorm.rows() << " cols " << colnorm.cols() << std::endl;
 // This loop can be multithreaded!
   for(int l = 0; l < nl; l++) {   // Pity that we have to loop through all rows
     std::ptrdiff_t i;

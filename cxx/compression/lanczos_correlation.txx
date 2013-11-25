@@ -59,7 +59,7 @@ void lanczos_correlation(const MatrixXX &Xtranslated, const int nbr_eig, const S
 	max_err = max( abs(((Xtranslated*(Xtranslated.transpose()*EV.col(count)) - EV.col(count)*this_eig).norm())/this_eig), max_err);
       }
       if ( max_err < tol ) {
-        cout << "The maximum error is : " << max_err << " after " << iter << " iterations" << endl;
+        // cout << "The maximum error is : " << max_err << " after " << iter << " iterations" << endl;
 	break;
       }
     }

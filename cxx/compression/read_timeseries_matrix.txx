@@ -89,11 +89,6 @@ MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<st
   /* Read one slab of data. */
   if ((retval = nc_get_vara_double(ncid, varid, start, count, data))) ERR(retval);
 
-  //  std::vector<ScalarType> output(data, data+slab_size);
-
-  typedef MatrixXX MatrixX;
-
-  
   int dim1, dim2;
 
   switch (ndims) 
@@ -101,11 +96,11 @@ MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<st
     case 2:  dim1 = count[0]; dim2 = count[1]; break;
     case 3:  dim1 = count[0]; dim2 = count[1]*count[2]; break;
     case 4:  dim1 = count[0]*count[1]; dim2 = count[2]*count[3]; break;
-  default: std::cout << "Number dimensions " << ndims << " not supported " << std::endl; break;
+    default: std::cout << "Number dimensions " << ndims << " not supported " << std::endl; break;
   }
 
   std::cout << "Creating eigen matrix " << dim1 << " X " << dim2 << std::endl;
-  Map<MatrixX> output(data,dim1,dim2); 
+  Map<MatrixXX> output(data,dim2,dim1); 
   free( dims );
   free( dimids );
   free( start );
@@ -115,6 +110,6 @@ MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<st
   /* Close the file, freeing all resources. */
   if ((retval = nc_close(ncid)))
     ERR(retval);
-     
-  return output;
+
+  return output.transpose();   // We want time x levels to be in the first dimension; horizontal dimensions in second
 }
