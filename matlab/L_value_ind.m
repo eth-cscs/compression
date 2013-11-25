@@ -1,8 +1,5 @@
-% Wvritten by Danny Bivckson, CMU
-% Matlab code for running Lanczos algorithm (finding eigenvalues of a 
-% PSD matrix)
+% Wvritten by Will Sawyer, CSCS
 
-% Code available from: http://www.cs.cmu.edu/~bickson/gabp/
 function [val] = L_value_ind(GammaInd, TT, X, Theta)
 
 %
@@ -37,11 +34,9 @@ function [val] = L_value_ind(GammaInd, TT, X, Theta)
 %   largest eigenvalue, and is the one we want.
 
 K = size(Theta,2);
-nj = size(Theta,1);
-Nt = size(X,2);
-Xtr = zeros(nj,Nt);
-Xfinal = zeros(nj,Nt);
-colnorm = zeros(Nt,1);
+Xtr = zeros(size(Theta,1),size(X,2));
+Xfinal = zeros(size(Theta,1),size(X,2));
+colnorm = zeros(size(X,2),1);
 
 val = 0;
 for i = 1:K  % Over the meta-stable subspaces (independent)

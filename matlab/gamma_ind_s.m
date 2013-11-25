@@ -27,11 +27,9 @@ function [GammaInd] = gamma_ind_s(X,Theta,TT)
 %  is only an index vector.
 %
 
-nj = size(X,1);
-Nt = size(X,2);
 K  = size(TT,2);
-GammaInd = zeros(Nt,1);
-colnorm = zeros(Nt,K);
+GammaInd = zeros(size(X,2),1);
+colnorm = zeros(size(X,2),K);
 
 for i = 1:K  % Over the meta-stable subspaces (independent)
     Xtr = bsxfun(@minus,X,Theta(:,i));   % Theta is new origin

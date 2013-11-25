@@ -78,7 +78,7 @@ while ~stop && j<maxits,
 
 % Identify indices of desired eigenvalues
     if j>=k,
-        indices = (j:-1:j-k+1);
+        indices = (j-k+1:1:j);
         r = Xtr*Xtr'*V(:,indices)- V(:,indices)*E(indices,indices); 
         for i=1:k, normr(i) = norm(r(:,i)); end,  %normr
 % Stop when relative residual norms of k largest eigenvalues are less than tol 

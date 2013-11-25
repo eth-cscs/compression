@@ -18,16 +18,13 @@ function [Theta] = theta_ind_s(GammaInd, X, K)
 %   into one i
 
 Theta = zeros(size(X,1),K);
-sum_gamma = zeros(1,K);
 
 for i=1:K
-    sum_gamma(i)=sum(GammaInd==i);
-end
-
-for i=1:K
-    if (sum_gamma(i) > 0)
-        Theta(:,i) = sum(X(:,find(GammaInd==i)),2)/sum_gamma(i);
+    sum_gamma=sum(GammaInd==i);
+    if (sum_gamma > 0)
+        Theta(:,i) = sum(X(:,find(GammaInd==i)),2)/sum_gamma;
     end
+    K_norm = [ i norm( Theta(:,i) ) ]
 end
 
 %
