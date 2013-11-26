@@ -17,7 +17,7 @@
 #define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(ERRCODE);}
 
 template <typename ScalarType>
-MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields )
+MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields, const int iam_in_x, const int iam_in_y, const int pes_in_x, const int pes_in_y )
 {
   int ncid, varid;
   int ndims;
@@ -38,10 +38,11 @@ MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<st
 
   MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );   
   MPI_Comm_size( MPI_COMM_WORLD, &mpi_processes );
+  // Assumptions: mpi_processes is power of 2
 
   /* Open the file. NC_NOWRITE tells netCDF we want read-only access to the file.*/
 
-  std::cout << "Processing: " << filename.c_str() << " SEARCHING FOR " << fields[0].c_str() << std::endl;
+  if ( my_rank == 0 ) std::cout << "Processing: " << filename.c_str() << " SEARCHING FOR " << fields[0].c_str() << std::endl;
 
   if ((retval = nc_open_par(filename.c_str(), NC_NOWRITE|NC_MPIIO, comm, info, &ncid))) ERR(retval);
   //  sequential: if ((retval = nc_open(filename.c_str(), NC_NOWRITE, &ncid))) ERR(retval);
@@ -50,7 +51,7 @@ MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<st
 
   if ((retval = nc_inq_varndims(ncid, varid, &ndims))) ERR(retval);
   
-  std::cout << "ndims " << ndims << std::endl;
+  if ( my_rank == 0 ) std::cout << "ndims " << ndims << std::endl;
 
   dimids = (int*)    malloc (sizeof(int)*ndims);
   start  = (size_t*) malloc (sizeof(size_t)*ndims);   // Starting points for parallel implementation
@@ -62,30 +63,41 @@ MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<st
   p = dims;
   for (int i=0; i<ndims; ++i ) {
     if ((retval = nc_inq_dimlen(ncid, dimids[i], p))) ERR(retval);
-    std::cout << "dimension = " << *p++ << std::endl;
+    if ( my_rank == 0 ) std::cout << "dimension = " << *p << std::endl;
+    *p++;
     start[i] = 0;
   }
 
-  if (dims[0] % mpi_processes != 0)
-    {
-      if (!my_rank) std::cout << "dims[0] " << dims[0] << " is not evenly divisible by mpi_size= " << mpi_processes << std::endl;
+  for (int i=0; i < ndims-2; ++i) {   // First dimensions are not distributed 
+    start[i] = 0;
+    count[i] = dims[i];
+  }
+  // Last two dimensions are distributed, assumes that dimensions are divisible by decomposition\
+
+  
+  if (dims[ndims-2] % pes_in_x != 0) {
+      if (!my_rank) std::cout << "dims[ndims-2] " << dims[ndims-2] << " is not divisible by pes_in_x = " << pes_in_x << std::endl;
       static Matrix<ScalarType,0,0> empty_vector;
       return empty_vector;
-    }
-  
-  count[0] = dims[0] / mpi_processes;         // Number of 2D slices, domain decomposed in first dimension for now
+  } 
+  start[ndims-2] = iam_in_x * ( dims[ndims-2] / pes_in_x );
+  count[ndims-2] = dims[ndims-2] / pes_in_x; 
 
-  slab_size = count[0];
-  for (int i=1; i<ndims; ++i ) { 
-    start[i] = 0; count[i] = dims[i]; slab_size *= dims[i]; 
-    std::cout << i << " start " << start[i] << " count " << count[i] << std::endl;
-  }
+  if (dims[ndims-1] % pes_in_y != 0) {
+      if (!my_rank) std::cout << "dims[ndims-1] " << dims[ndims-1] << " is not divisible by pes_in_y = " << pes_in_y << std::endl;
+      static Matrix<ScalarType,0,0> empty_vector;
+      return empty_vector;
+  } 
+  start[ndims-1] = iam_in_y * ( dims[ndims-1] / pes_in_y ) ;
+  count[ndims-1] = dims[ndims-1] / pes_in_y; 
+
+  slab_size = 1;
+  for (int i=0; i < ndims; ++i) { slab_size *= count[i]; }
 
   data  = (ScalarType*) malloc (sizeof(ScalarType)*slab_size);
 
   /* Read the slab this process is responsible for. */
-  start[0] = dims[0] / mpi_processes * my_rank;
-  std::cout << "Rank: " << my_rank << " reading slab with size" << slab_size << std::endl;
+  std::cout << "Rank: " << my_rank << " reading count " << count[0] << count[1] << count[2] << count[3] << " start " << start[0] << start[1] << start[2] << start[3] << std::endl;
   /* Read one slab of data. */
   if ((retval = nc_get_vara_double(ncid, varid, start, count, data))) ERR(retval);
 

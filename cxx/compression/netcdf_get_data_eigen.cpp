@@ -10,8 +10,8 @@ using namespace Eigen;
 #include <boost/numeric/ublas/io.hpp>
 */
 
-#define MAX_ITER 100
-#define TOL 1.0e-3
+#define MAX_ITER 10
+#define TOL 1.0e-7
 
 #include <random>
 #include <algorithm>
@@ -129,11 +129,24 @@ int main(int argc, char *argv[])
   MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );   
   MPI_Comm_size( MPI_COMM_WORLD, &mpi_processes );
 
-  if (argc <= 2)
-    {
-      std::cout << "Usage: " << argv[0] << " <Filename>" << " <field name>" << std::endl;
-      exit(1);
-    }
+  if (argc <= 2) {
+    std::cout << "Usage: " << argv[0] << " <Filename>" << " <field name>" << std::endl;
+    exit(1);
+  }
+
+  int pes_in_x;
+  int pes_in_y = 1;
+
+  for ( pes_in_x = mpi_processes; pes_in_x > pes_in_y; pes_in_x /= 2 ) { pes_in_y *= 2; }
+
+  const int iam_in_x = my_rank % pes_in_x;
+  const int iam_in_y = my_rank / pes_in_x;
+
+  std::cout << "Decomposition:  pes_in_x " << pes_in_x << " pes_in_y " << pes_in_y << " iam x " << iam_in_x << " iam_in_y " << iam_in_y << std::endl;
+
+  if ( pes_in_x * pes_in_y != mpi_processes ) { std::cout << "mpi_processes " << mpi_processes << " not power of two; aborting " << std::endl; abort(); }
+
+
 
 
 #if defined(VIENNACL_WITH_OPENCL) || defined(VIENNACL_WITH_OPENMP) || defined(VIENNACL_WITH_CUDA)
@@ -181,7 +194,7 @@ int main(int argc, char *argv[])
 #endif
 
 
-  std::cout << "Parallel execution: my_rank " << my_rank << " out of " << mpi_processes << " processes" << std::endl;
+   // std::cout << "Parallel execution: my_rank " << my_rank << " out of " << mpi_processes << " processes" << std::endl;
 
 
   std::string              filename(argv[1]);
@@ -189,8 +202,7 @@ int main(int argc, char *argv[])
 
   typedef Array<int, Dynamic, 1> ArrayX1i;
 
-  MatrixXX   X = read_timeseries_matrix<ScalarType>( filename, fields);
-
+  MatrixXX   X = read_timeseries_matrix<ScalarType>( filename, fields, iam_in_x, iam_in_y, pes_in_x, pes_in_y );
 
 
   /*
@@ -204,13 +216,13 @@ int main(int argc, char *argv[])
   // want vector of length X.rows() of random values between {0,k-1}
   //
 
-#define K 10
+#define K 5
 
   // create a blank vector of length X.rows()
   const int Ntl = static_cast<int>(X.rows());
   const int nl = static_cast<int>(X.cols());
   // std::cout << "First row X " << X.block(0,0,Ntl,5) << std::endl;
-  ArrayX1i gamma_ind = gamma_zero(nl, K );
+  ArrayX1i gamma_ind = gamma_zero(nl, K );      // Needs to be generated in a consistent way for any PE configuration
   MatrixXX theta = MatrixXX::Zero(Ntl,K);       // Time series means (one for each k), allocate outside loop
   MatrixXX TT(Ntl,K);                 // Eigenvectors (one for each k), allocate outside loop
   MatrixXX Xtranslated( Ntl, nl ) ;   // Maximum size for worst case (all nl in one K)

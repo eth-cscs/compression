@@ -10,6 +10,7 @@
 
 ScalarType L_value( const ArrayX1i &gamma_ind, const MatrixXX &TT, const MatrixXX &X, const MatrixXX &theta )
 {
+  ScalarType value  = 0.0;
   ScalarType output = 0.0;
 
   const int Ntl = X.rows();
@@ -40,7 +41,8 @@ ScalarType L_value( const ArrayX1i &gamma_ind, const MatrixXX &TT, const MatrixX
     }
   }
   // Now Xtranslated contains the column vectors for all l in 0..nl-1; the norms just need to be summed
-  for (int l = 0; l < nl; l++ ) { output += Xtranslated.col(l).norm(); }  // translate each column of X
+  for (int l = 0; l < nl; l++ ) { value += Xtranslated.col(l).norm(); }  // translate each column of X
+  MPI_Allreduce( &value, &output, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
   return output;
 }
 
