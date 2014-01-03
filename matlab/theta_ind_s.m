@@ -21,13 +21,13 @@ Theta = zeros(size(X,1),K);
 
 for i=1:K
     sum_gamma=sum(GammaInd==i);
-    K_nbr_nonzeros = [i sum_gamma]
+    %DEBUG% K_nbr_nonzeros = [i sum_gamma]
     Nonzeros = find(GammaInd==i);
     if (sum_gamma > 0)
-        k_norm_X_first = [i norm(X(:,Nonzeros(1)) )]
+        %DEBUG% k_norm_X_first = [i norm(X(:,Nonzeros(1)) )]
         Theta(:,i) = sum(X(:,find(GammaInd==i)),2)/sum_gamma;
     end
-    k_norm_theta = [i norm(Theta(:,i) )]
+    %DEBUG% k_norm_theta = [i norm(Theta(:,i) )]
 end
 
 %

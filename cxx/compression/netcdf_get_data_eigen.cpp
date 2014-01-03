@@ -216,22 +216,39 @@ int main(int argc, char *argv[])
   // want vector of length X.rows() of random values between {0,k-1}
   //
 
+  // Size of space
 #define K 5
+  // Number of EOF used in final compression
+#define M 5
 
   // create a blank vector of length X.rows()
   const int Ntl = static_cast<int>(X.rows());
   const int nl = static_cast<int>(X.cols());
+  int *nl_global;
+  nl_global = (int*) malloc (sizeof(int)*mpi_processes);
+  MPI_Allgather( &nl, 1, MPI_INT, nl_global, 1, MPI_INT, MPI_COMM_WORLD);
+  // std::cout << "nl sizes "; for ( int rank=0; rank < mpi_processes; rank++ ) { std::cout << nl_global[rank] << " "; } 
+  // std::cout << std::endl;
+
   // std::cout << "First row X " << X.block(0,0,Ntl,5) << std::endl;
-  ArrayX1i gamma_ind = gamma_zero(nl, K );      // Needs to be generated in a consistent way for any PE configuration
+  ArrayX1i gamma_ind = gamma_zero(nl_global, my_rank, K );      // Needs to be generated in a consistent way for any PE configuration
   MatrixXX theta = MatrixXX::Zero(Ntl,K);       // Time series means (one for each k), allocate outside loop
-  MatrixXX TT(Ntl,K);                 // Eigenvectors (one for each k), allocate outside loop
+  // MatrixXX TT(Ntl,K);                 // Eigenvectors (one for each k), allocate outside loop
   MatrixXX Xtranslated( Ntl, nl ) ;   // Maximum size for worst case (all nl in one K)
-  MatrixXX eigenvectors( Ntl, 1 ) ;   // Only one eigenvector at this stage
+  MatrixXX eigenvectors( Ntl, 1 ) ;   // Only one eigenvector for the iteration stage
+
+  MatrixXX *TT =new MatrixXX[K] ;   // K EOF matrices of size Ntl x M for the actual compression
+  MatrixXX *EOFs =new MatrixXX[K] ;   // K EOF matrices of size Ntl x M for the actual compression
+  for (int k = 0; k < K; k++) {
+    TT[k] = MatrixXX::Zero(Ntl,1);   // Create the matrices
+    EOFs[k] = MatrixXX::Zero(Ntl,M);   // Create the matrices
+  }
 
   ScalarType L_value_old = 1.0e19;   // Very big value
   ScalarType L_value_new;  
   for ( int iter = 0; iter < MAX_ITER; iter++ ) {
     theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
+    // Not clear if there should be monotonic decrease here:  new theta_s needs new TT, right?
     // if ( iter > 0 ) { std::cout << "L value after theta determination " << L_value( gamma_ind, TT, X, theta ) << std::endl; }
     for(int k = 0; k < K; k++) {              // Principle Component Analysis
       std::vector<int> Nonzeros = find( gamma_ind, k );
@@ -240,8 +257,7 @@ int main(int argc, char *argv[])
       {
 	Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
       }
-      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-7, 20, eigenvectors);
-      TT.col(k) = eigenvectors.col(0);
+      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-11, 20, TT[k]);
     }
     std::cout << "L value after PCA " << L_value( gamma_ind, TT, X, theta ) << std::endl;
     gamma_s( X, theta, TT, gamma_ind );
@@ -257,6 +273,19 @@ int main(int argc, char *argv[])
     }
     L_value_old = L_value_new;
   }
+
+  theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
+  for(int k = 0; k < K; k++) {              // Principle Component Analysis
+    std::vector<int> Nonzeros = find( gamma_ind, k );
+    //      std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
+    for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
+    {
+      Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
+    }
+    lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), M, 1.0e-6, 200, EOFs[k]);
+  }
+  L_value_new =  L_value( gamma_ind, EOFs, X, theta ); 
+  std::cout << "L value final " << L_value_new << std::endl;
 
 //  auto result1 = std::find_if(gamma_ind.data(), gamma_ind.data()+gamma_ind.rows(), std::bind2nd (std::equal_to<int>(), 4));
 //  std::cout << "result of find operation is " << std::endl 

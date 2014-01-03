@@ -17,12 +17,13 @@ function [GammaInd] = gamma_ind_zero(nl,K)
 %  index vector
 %
 
-% RANDOM VARIANT:  GammaInd  = randi(K,nl,1);
+GammaInd  = randi(K,nl,1);
 
-for m=1:48
-for l=m:48:nl
-   GammaInd(l) = mod((l-1),K) + 1;   % One-based indices
-end
-end
+% HERE: trying to implement a reproducible version for dist. memory
+% for m=1:48
+% for l=m:48:nl
+%   GammaInd(l) = mod((l-1),K) + 1;   % One-based indices
+% end
+% end
 
 end

@@ -4,6 +4,7 @@ function [val] = L_value_ind(GammaInd, TT, X, Theta)
 
 %
 %   \gamma \in \Re^{Nt \times K}
+%   BUT:  \GammaInd \in I^{Nt}
 %   TT \in \Re^{nj \times K}
 %   \theta \in \Re^{nj \times K}
 %
@@ -44,7 +45,8 @@ for i = 1:K  % Over the meta-stable subspaces (independent)
     Nonzeros=find(GammaInd==i);
     Xtr = bsxfun(@minus,X,Theta(:,i));   % Theta is new origin
     Xfinal = Xtr - TT(:,i)*TT(:,i)'*Xtr;
-    colnorm = sqrt(sum(Xfinal.^2,1))';
+    % colnorm = sqrt(sum(Xfinal.^2,1))';
+    colnorm = sum(Xfinal.^2,1)';
     val = val+sum(colnorm(Nonzeros));
 end
 

@@ -26,6 +26,7 @@ factor=0;
 m=5;   % Size of compression subspace
 K=10;
 max_iter = 1000;
+lanczos_tol = 1e-4;
 
 % filename = '/project/csstaff/outputs/echam/echam6/echam_output/t31_196001.01_echam.nc';
 ncid = netcdf.open(filename,'NC_NOWRITE');
@@ -121,8 +122,6 @@ clear rel_err compr_factor rel com compr_factor_stat idx
 X = X';   % use the transpose to better correspond to old code.
 [Ntl,nl]=size(X)
 
-X(:,1:48:240)
-
 EV = zeros(Ntl,m,K);
 
 %tol=[1e-2 1e-3 5e-4 1e-4 5e-5 1e-6];
@@ -137,22 +136,23 @@ for ind_tol=1:length(tol)
         for i=1:K
             Nonzeros = find(GammaInd==i);
             Xtr = bsxfun(@minus,X(:,Nonzeros),Theta(:,i));
-            [TT(:,i),j,flag] = lanczos_elman_ind(Xtr,i,1,1e-5,20,0);
+            [TT(:,i),j,flag] = lanczos_elman_ind(Xtr,i,1,lanczos_tol,20,1);
         end
         LafterTT = L_value_ind(GammaInd, TT, X, Theta)
         GammaInd = gamma_ind_s(X,Theta,TT);
         Lnew = L_value_ind(GammaInd, TT, X, Theta)
-        stop = (Lold - Lnew < tol);
+        stop = (Lold - Lnew < tol(ind_tol));
         iter = iter + 1;
         Lold = Lnew;
     end
     %
     % Perform the actual compression
     %
+    Theta = theta_ind_s(GammaInd, X, K);
     for i=1:K
         Nonzeros = find(GammaInd==i);
         Xtr = bsxfun(@minus,X(:,Nonzeros),Theta(:,i)); % Theta is new origin
-        [EV(:,:,i),j,flag] = lanczos_elman_ind(Xtr,i,m,ind_tol,100,0);
+        [EV(:,:,i),j,flag] = lanczos_elman_ind(Xtr,i,m,lanczos_tol,100,1);
     end
     Lfinal = L_value_mlarge_ind(GammaInd, EV, X, Theta)
 end

@@ -13,7 +13,7 @@ dL=100000;
 n_iter=1
 while and(dL>opt.tol,n_iter<opt.MaxIter)
    %%% Identifikation of optimal theta (mu and T) for fixed gamma
-   [res,mu,T,L(n_iter)]=ClusterMeanCov(x,gamma); 
+   [res,mu,T,L(n_iter)]=ClusterMeanCov_Will(x,gamma); 
    %%% Identifikation of optimal gamma for a fixed theta (mu and T)
    for t=1:T
       gamma(:,t)=0; 

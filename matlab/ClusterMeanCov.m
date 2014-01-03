@@ -24,4 +24,4 @@ for k=1:K
         res(k,t)=norm(r-TT(k,:)'*TT(k,:)*r,2)^2;
     end    
 end
-L=sum(sum(gamma.*res));
+L=sum(sum(gamma.*res))

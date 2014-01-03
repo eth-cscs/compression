@@ -2,7 +2,7 @@
 % Matlab code for determining the new gamma probabilities
 
 % Code available from: http://www.cs.cmu.edu/~bickson/gabp/
-function [GammaInd] = gamma_s(Xtr,TT)
+function [Gamma] = gamma_s(Xtr,TT)
 
 %
 %   \gamma \in \Re^{Nt \times K}

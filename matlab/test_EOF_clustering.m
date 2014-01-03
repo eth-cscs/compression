@@ -1,4 +1,4 @@
-clear all
+clear allv
 close all
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -8,6 +8,7 @@ mu1=[0 0];mu2=[0 0];
 S1=[20 0;0 1];S2=[1 0;0 20];
 n=100;
 gamma=[ones(1,n) 2*ones(1,n) ones(1,n) 2*ones(1,n)];
+randn('seed',0);  % Make reproducible for debugging
 T=length(gamma);
 for t=1:T
 x(t,:)=(gamma(t)==1)*mvnrnd(mu1,S1)+(gamma(t)==2)*mvnrnd(mu2,S2);

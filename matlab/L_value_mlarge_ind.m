@@ -44,7 +44,7 @@ for i = 1:K  % Over the meta-stable subspaces (independent)
     Nonzeros=find(GammaInd==i);
     Xtr = bsxfun(@minus,X,Theta(:,i));   % Theta is new origin
     Xfinal = Xtr - TT(:,:,i)*TT(:,:,i)'*Xtr;
-    colnorm = sqrt(sum(Xfinal.^2,1))';
+    colnorm = sum(Xfinal.^2,1)';
     val = val+sum(colnorm(Nonzeros));
 end
 
