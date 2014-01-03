@@ -28,10 +28,15 @@ void lanczos_correlation(const MatrixXX &Xtranslated, const int nbr_eig, const S
 
   VectorX AV = Xtranslated*(Xtranslated.transpose()*V.col(0));  // order important! evaluate right to left to save calculation!
 
-  for(int iter=1; iter < max_iter; iter++)   // main loop (sequential), will terminate earlier if tolerance is reached
+  ScalarType convergence_error;
+  int iter;
+
+  for(iter=1; iter < max_iter; iter++)   // main loop (sequential), will terminate earlier if tolerance is reached
   {
     VectorX global_vector( nrows );
 
+    // The Allreduce here implies that AV.data will not be reproducible over all PE configurations.  
+    // a reproducible variant should be provided
     MPI_Allreduce( AV.data(), global_vector.data(), nrows, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
 
     if ( iter == 1 ) { V.col(iter) = global_vector; }
@@ -60,21 +65,24 @@ void lanczos_correlation(const MatrixXX &Xtranslated, const int nbr_eig, const S
     MatrixXX UT = eigensolver.eigenvectors();   // Ritz vectors
 
     if ( iter >= nbr_eig ) {
+      ScalarType max_err = 0.0;
       VectorX local_vector( nrows );
       EV = V.block(0,0,nrows,iter+1)*UT.block(0,iter-nbr_eig+1,iter+1,nbr_eig);  // Eigenvector approximations
-      ScalarType max_err = 0.0;
       for (int count = 0; count < nbr_eig; count++) {      // Go through the Ritz values of interest
         ScalarType this_eig = eigs(count+iter-nbr_eig+1);  // Now determine the associated relative error
         local_vector = Xtranslated*(Xtranslated.transpose()*EV.col(count));
         // This communication is unfortunate; we could avoid this by doing max_iter iterations...
+        // The Allreduce here implies that global_vector will not be reproducible over all PE configurations.  
+        // a reproducible variant should be provided
         MPI_Allreduce( local_vector.data(), global_vector.data(), nrows, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
 	max_err = max( abs(((global_vector - EV.col(count)*this_eig).norm())/this_eig), max_err);
       }
+      convergence_error = max_err;
       if ( max_err < tol ) {
-        cout << "The maximum error is : " << max_err << " after " << iter << " iterations" << endl;
 	break;
       }
     }
-
   }
+  cout << "The maximum error is : " << convergence_error << " after " << iter << " iterations" << endl;
+
 }

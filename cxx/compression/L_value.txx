@@ -4,11 +4,11 @@
 	   @param[in]     gamma_ind   placement of state probabilities
 	   @param[in]     X           Time series (MatrixXX)
 	   @param[in]     theta       List of the fields to be extracted (MatrixXX)
-	   @param[in]     TT          Eigenvectors (MatrixXX)
+	   @param[in]     EOFs        Final EOFs (Array of MatrixXX)
 	   @return                    Norm (ScalarType)
 	 */
 
-ScalarType L_value( const ArrayX1i &gamma_ind, const MatrixXX &TT, const MatrixXX &X, const MatrixXX &theta )
+ScalarType L_value( const ArrayX1i &gamma_ind, const MatrixXX *EOFs, const MatrixXX &X, const MatrixXX &theta )
 {
   ScalarType value  = 0.0;
   ScalarType output = 0.0;
@@ -25,23 +25,14 @@ ScalarType L_value( const ArrayX1i &gamma_ind, const MatrixXX &TT, const MatrixX
   for(int k = 0; k < K; k++) {
     std::vector<int> Nonzeros = find( gamma_ind, k );
 
-/*
-    // First attempt:  the dynamic allocation of Xtranslated is undesirable; move outside loop
-    MatrixXX Xtranslated(X.rows(),Nonzeros.size());    // Partition subset for this K
-    for (int m = 0; m < Nonzeros.size() ; m++ ) {       // Translate X columns with mean value at new origin
-      Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
-    }
-    Xtranslated -= TT.col(k) * ( TT.col(k).transpose() * Xtranslated );
-    for (int m = 0; m < Nonzeros.size(); m++) { output += Xtranslated.col(m).norm(); }  // translate each column of X
-*/
     for (int m = 0; m < Nonzeros.size() ; m++ ) {       // Translate X columns with mean value at new origin
       
       Xtranslated.col(Nonzeros[m])  = X.col(Nonzeros[m]) - theta.col(k);                     // Translated to theta_k 
-      Xtranslated.col(Nonzeros[m]) -=  TT.col(k) * ( TT.col(k).transpose() * Xtranslated.col(Nonzeros[m]) ); 
+      Xtranslated.col(Nonzeros[m]) -=  EOFs[k] * ( EOFs[k].transpose() * Xtranslated.col(Nonzeros[m]) ); 
     }
   }
-  // Now Xtranslated contains the column vectors for all l in 0..nl-1; the norms just need to be summed
-  for (int l = 0; l < nl; l++ ) { value += Xtranslated.col(l).norm(); }  // translate each column of X
+  // Now Xtranslated contains the column vectors for all l in 0..nl-1; the square norms just need to be summed
+  for (int l = 0; l < nl; l++ ) { ScalarType colnorm = Xtranslated.col(l).norm(); value += colnorm*colnorm; }  
   MPI_Allreduce( &value, &output, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
   return output;
 }

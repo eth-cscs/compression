@@ -8,7 +8,7 @@
 	   @return                    void
 	 */
 
-void gamma_s( const MatrixXX &X, const MatrixXX &theta, const MatrixXX &TT, ArrayX1i &gamma_ind )
+void gamma_s( const MatrixXX &X, const MatrixXX &theta, const MatrixXX *TT, ArrayX1i &gamma_ind )
 {
   const int K  = theta.cols();
   const int Ntl = X.rows();
@@ -17,13 +17,11 @@ void gamma_s( const MatrixXX &X, const MatrixXX &theta, const MatrixXX &TT, Arra
   MatrixXX Xtranslated( Ntl, nl ) ;
   MatrixXX colnorm( nl, K ) ;
 
-//  std::cout << "TT rows " << TT.rows() << " cols " << TT.cols() << std::endl;
-
 // This loop can be multithreaded, if all threads have a separate copy of Xtranslated
   for(int k = 0; k < K; k++) {
 // This loop can be multithreaded!
     for(int l = 0; l < nl; l++) { Xtranslated.col(l) = X.col(l) - theta.col(k); }  // translate each column of X
-    Xtranslated -= TT.col(k) * ( TT.col(k).transpose() * Xtranslated );
+    Xtranslated -= TT[k] * ( TT[k].transpose() * Xtranslated );
 // This loop can be multithreaded!
     for(int l = 0; l < nl; l++) { colnorm(l,k) = Xtranslated.col(l).norm(); }  // translate each column of X
   }

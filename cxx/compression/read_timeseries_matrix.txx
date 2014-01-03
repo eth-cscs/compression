@@ -111,7 +111,7 @@ MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<st
     default: std::cout << "Number dimensions " << ndims << " not supported " << std::endl; break;
   }
 
-  std::cout << "Creating eigen matrix " << dim1 << " X " << dim2 << std::endl;
+  // std::cout << "Creating eigen matrix " << dim1 << " X " << dim2 << std::endl;
   Map<MatrixXX> output(data,dim2,dim1); 
   free( dims );
   free( dimids );
