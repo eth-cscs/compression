@@ -10,7 +10,7 @@ using namespace Eigen;
 #include <boost/numeric/ublas/io.hpp>
 */
 
-#define MAX_ITER 10
+#define MAX_ITER 100
 #define TOL 1.0e-7
 
 #include <random>
@@ -257,19 +257,23 @@ int main(int argc, char *argv[])
       {
 	Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
       }
-      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-11, 20, TT[k]);
+      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-13, 50, TT[k], true);
     }
-    std::cout << "L value after PCA " << L_value( gamma_ind, TT, X, theta ) << std::endl;
+    L_value_new =  L_value( gamma_ind, TT, X, theta ); 
+    if (!my_rank) std::cout << "L value after PCA " << L_value_new << std::endl;
     gamma_s( X, theta, TT, gamma_ind );
     L_value_new =  L_value( gamma_ind, TT, X, theta ); 
-    std::cout << "L value after gamma minimization " << L_value_new << std::endl;
-    if ( L_value_new > L_value_old ) { 
-      std::cout << "New L_value " << L_value_new << " larger than old: " << L_value_new << " aborting " << std::endl;
+    if (!my_rank) std::cout << "L value after gamma minimization " << L_value_new << std::endl;
+    if ( (L_value_old - L_value_new) < L_value_new*TOL ) {
+      if (!my_rank) std::cout << " Converged: to tolerance " << TOL << " after " << iter << " iterations " << std::endl;
       break;
     }
-    else if ( (L_value_old - L_value_new) < L_value_new*TOL ) {
-      std::cout << " Converged: to tolerance " << TOL << std::endl;
+    else if ( L_value_new > L_value_old ) { 
+      if (!my_rank) std::cout << "New L_value " << L_value_new << " larger than old: " << L_value_new << " aborting " << std::endl;
       break;
+    }
+    else if ( iter+1 == MAX_ITER ) {
+      if (!my_rank) std::cout << " Reached maximum number of iterations " << MAX_ITER << " without convergence " << std::endl;
     }
     L_value_old = L_value_new;
   }
@@ -282,30 +286,16 @@ int main(int argc, char *argv[])
     {
       Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
     }
-    lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), M, 1.0e-6, 200, EOFs[k]);
+    lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), M, 1.0e-6, 200, EOFs[k], true);
   }
   L_value_new =  L_value( gamma_ind, EOFs, X, theta ); 
-  std::cout << "L value final " << L_value_new << std::endl;
-
-//  auto result1 = std::find_if(gamma_ind.data(), gamma_ind.data()+gamma_ind.rows(), std::bind2nd (std::equal_to<int>(), 4));
-//  std::cout << "result of find operation is " << std::endl 
-//    << result1.format(CommaInitFmt) << std::endl;
-
-/*
-  for(int k = 0; k < theta.cols(); k++) {
-    std::cout << "index set for k =  " << k << std::endl ;
-    std::vector<int> found_items = find( gamma_ind, k );
-
-    copy(found_items.begin(), found_items.end(), ostream_iterator<int>(cout, ", "));
-    std::cout << std::endl ;
-  }
-*/
+  if (!my_rank) std::cout << "L value final " << L_value_new << std::endl;
 
 //
 //  Terminate MPI.
 //
   retval =  0;
-  std::cout << "retval " << retval << std::endl;
+  if (!my_rank) std::cout << "retval " << retval << std::endl;
 
   MPI::Finalize ( );
 

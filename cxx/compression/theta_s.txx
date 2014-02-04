@@ -33,7 +33,7 @@ void theta_s(const ArrayX1i &gamma_ind, const MatrixXX &X, MatrixXX &theta )
     std::vector<int> Nonzeros = find( gamma_ind, k );   // Could use a matrix for this to avoid 2nd load;
     ScalarType sum_gamma;   // Number of entries containing each index
     sum_gamma = static_cast<ScalarType> (global_nbr_nonzeros[k]);
-    std::cout << "k " << k << " nonzeros " << sum_gamma << " " << Nonzeros[0] << " " << Nonzeros[1] << " " << Nonzeros[2] << std::endl;
+    // std::cout << "k " << k << " nonzeros " << sum_gamma << " " << Nonzeros[0] << " " << Nonzeros[1] << " " << Nonzeros[2] << std::endl;
     if ( sum_gamma > 0 ) {
       //  std::cout << "Norm of first X column " << X.col(Nonzeros[0]).norm() << std::endl;
       local_theta.col(k) = X.col(Nonzeros[0]); 
