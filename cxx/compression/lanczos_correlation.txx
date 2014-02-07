@@ -46,62 +46,6 @@ void lanczos_correlation(const MatrixXX &Xtranslated, const int ne, const Scalar
   ScalarType convergence_error;
   int iter;
 
-/*
-  for(iter=1; iter < max_iter; iter++)   // main loop (sequential), will terminate earlier if tolerance is reached
-  {
-    VectorX global_vector( N );
-
-    // The Allreduce here implies that w.data will not be reproducible over all PE configurations.  
-    // a reproducible variant should be provided
-    MPI_Allreduce( w.data(), global_vector.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
-
-    if ( iter == 1 ) { V.col(iter) = global_vector; }
-    else {  V.col(iter) = global_vector - gamma*V.col(iter-2); }
-
-    delta = V.col(iter).transpose() * V.col(iter-1);
-    V.col(iter) -= delta*V.col(iter-1);
-
-    gamma  = V.col(iter).norm();
-    V.col(iter) /= gamma;
-    // cout << "gamma " << gamma << " delta " << delta << " should be the same on all PEs" << endl;
-
-    // reorthogonalize  -- this can be an argument-driven option   OpenMP: no dependencies
-    for( int sub_iter = 0; sub_iter < iter; sub_iter++ )  {
-      ScalarType crap = V.col(iter).transpose()*V.col(sub_iter);
-      V.col(iter) -= crap*V.col(sub_iter);
-      //      V.col(iter) -= (V.col(iter).transpose()*V.col(sub_iter))*V.col(sub_iter);  // run-time crash... Why?
-    }
-
-    w = Xtranslated*(Xtranslated.transpose()*V.col(iter));  // order important! evaluate right to left to save calculation!
-    Trid(iter-1,iter-1) = delta;  Trid(iter-1,iter) = gamma;  Trid(iter,iter-1) = gamma;
-    SelfAdjointEigenSolver<MatrixXX> eigensolver(Trid.block(0,0,iter+1,iter+1));
-    if (eigensolver.info() != Success) abort();
-
-    VectorX  eigs = eigensolver.eigenvalues();  // Ritz values, sorted (largest eigenvalues last)
-    MatrixXX UT = eigensolver.eigenvectors();   // Ritz vectors
-
-    if ( iter >= ne ) {
-      ScalarType max_err = 0.0;
-      VectorX local_vector( N );
-      EV = V.block(0,0,N,iter+1)*UT.block(0,iter-ne+1,iter+1,ne);  // Eigenvector approximations
-      for (int count = 0; count < ne; count++) {      // Go through the Ritz values of interest
-        ScalarType this_eig = eigs(count+iter-ne+1);  // Now determine the associated relative error
-        local_vector = Xtranslated*(Xtranslated.transpose()*EV.col(count));
-        // This communication is unfortunate; we could avoid this by doing max_iter iterations...
-        // The Allreduce here implies that global_vector will not be reproducible over all PE configurations.  
-        // a reproducible variant should be provided
-        MPI_Allreduce( local_vector.data(), global_vector.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
-	max_err = max( abs(((global_vector - EV.col(count)*this_eig).norm())/this_eig), max_err);
-      }
-      convergence_error = max_err;
-      if ( max_err < tol ) {
-	break;
-      }
-    }
-  }
-  cout << "The maximum error is : " << convergence_error << " after " << iter << " iterations" << endl;
-*/
-
     // main loop, will terminate earlier if tolerance is reached
     bool converged = false;
     for(int j=1; j<max_iter && !converged; ++j) {

@@ -1,14 +1,3 @@
-/*
-#include <iostream>
-#include <stdlib.h>
-#include <stdio.h>
-
-#include <iostream>
-#include <Eigen/Dense>
-using namespace Eigen;
-
-#include <boost/numeric/ublas/io.hpp>
-*/
 
 #define MAX_ITER 100
 #define TOL 1.0e-7
@@ -29,6 +18,8 @@ using namespace Eigen;
 #include <boost/numeric/ublas/assignment.hpp> 
 using namespace boost::numeric;
 
+#if defined( USE_EIGEN )
+
 #include "usi_compression.h"
 #include "read_timeseries_matrix.h"
 #include "gamma_zero.h"
@@ -37,7 +28,8 @@ using namespace boost::numeric;
 #include "theta_s.h"
 #include "lanczos_correlation.h"
 #include "L_value.h"
-//
+
+#endif
 
 #include "mpi.h"
 
@@ -85,6 +77,7 @@ int main(int argc, char *argv[])
 //  Author:
 //
 //    William Sawyer (CSCS)
+//    Ben Cumming (CSCS)
 //
 //  Reference:
 //    
@@ -95,7 +88,7 @@ int main(int argc, char *argv[])
 //
 //  Example execution:
 //
-//    aprun -n 2 ./netcdf_test /project/csstaff/outputs/echam/echam6/echam_output/t31_196001.01_echam.nc seaice
+//    aprun -n 2 ./netcdf_get_data /project/csstaff/outputs/echam/echam6/echam_output/t31_196001.01_echam.nc seaice
 //
 {
   using namespace std;
@@ -199,37 +192,40 @@ int main(int argc, char *argv[])
 
   std::string              filename(argv[1]);
   std::vector<std::string> fields(argv+2, argv+argc);
+  int  Xrows, Xcols;
 
-  typedef Array<int, Dynamic, 1> ArrayX1i;
+  ScalarType*  data = read_timeseries_matrix<ScalarType>( filename, fields, iam_in_x, iam_in_y, pes_in_x, pes_in_y, Xrows, Xcols );
 
-  MatrixXX   X = read_timeseries_matrix<ScalarType>( filename, fields, iam_in_x, iam_in_y, pes_in_x, pes_in_y );
+#if defined( USE_EIGEN )
+  std::cout << "Creating eigen matrix " << Xrows << " X " << Xcols << std::endl;
+  Map<MatrixXXrow> X(data,Xrows,Xcols);       // Needs to be row-major to mirror NetCDF output
+  std::cout << "Created eigen matrix " << Xrows << " X " << Xcols << std::endl;
+#endif
 
 
-  /*
-  VectorXd  b = VectorXd::Random(X.cols());
-  VectorXd  Xb = X * b;
-  std::cout << "matrix rows " << X.rows() << " cols " << X.cols() << std::endl;
-  std::cout << "norm rand vect " << b.norm() << " norm matrix * random vector " << Xb.norm() << std::endl;
-  */
-  
   //
   // want vector of length X.rows() of random values between {0,k-1}
   //
 
   // Size of space
-#define K 5
+#define K 10
   // Number of EOF used in final compression
 #define M 5
 
   // create a blank vector of length X.rows()
+
+#if defined( USE_EIGEN )
   const int Ntl = static_cast<int>(X.rows());
   const int nl = static_cast<int>(X.cols());
+#endif
+
   int *nl_global;
   nl_global = (int*) malloc (sizeof(int)*mpi_processes);
   MPI_Allgather( &nl, 1, MPI_INT, nl_global, 1, MPI_INT, MPI_COMM_WORLD);
   // std::cout << "nl sizes "; for ( int rank=0; rank < mpi_processes; rank++ ) { std::cout << nl_global[rank] << " "; } 
   // std::cout << std::endl;
 
+#if defined( USE_EIGEN )
   // std::cout << "First row X " << X.block(0,0,Ntl,5) << std::endl;
   ArrayX1i gamma_ind = gamma_zero(nl_global, my_rank, K );      // Needs to be generated in a consistent way for any PE configuration
   MatrixXX theta = MatrixXX::Zero(Ntl,K);       // Time series means (one for each k), allocate outside loop
@@ -248,11 +244,13 @@ int main(int argc, char *argv[])
   ScalarType L_value_new;  
   for ( int iter = 0; iter < MAX_ITER; iter++ ) {
     theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
+    L_value_new =  L_value( gamma_ind, TT, X, theta ); 
+    if (!my_rank) std::cout << "L value after Theta calc " << L_value_new << std::endl;
     // Not clear if there should be monotonic decrease here:  new theta_s needs new TT, right?
     // if ( iter > 0 ) { std::cout << "L value after theta determination " << L_value( gamma_ind, TT, X, theta ) << std::endl; }
     for(int k = 0; k < K; k++) {              // Principle Component Analysis
       std::vector<int> Nonzeros = find( gamma_ind, k );
-      //      std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
+      // if (!my_rank) std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
       for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
       {
 	Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
@@ -264,12 +262,12 @@ int main(int argc, char *argv[])
     gamma_s( X, theta, TT, gamma_ind );
     L_value_new =  L_value( gamma_ind, TT, X, theta ); 
     if (!my_rank) std::cout << "L value after gamma minimization " << L_value_new << std::endl;
-    if ( (L_value_old - L_value_new) < L_value_new*TOL ) {
-      if (!my_rank) std::cout << " Converged: to tolerance " << TOL << " after " << iter << " iterations " << std::endl;
+    if ( L_value_new > L_value_old ) { 
+      if (!my_rank) std::cout << "New L_value " << L_value_new << " larger than old: " << L_value_old << " aborting " << std::endl;
       break;
     }
-    else if ( L_value_new > L_value_old ) { 
-      if (!my_rank) std::cout << "New L_value " << L_value_new << " larger than old: " << L_value_new << " aborting " << std::endl;
+    else if ( (L_value_old - L_value_new) < L_value_new*TOL ) {
+      if (!my_rank) std::cout << " Converged: to tolerance " << TOL << " after " << iter << " iterations " << std::endl;
       break;
     }
     else if ( iter+1 == MAX_ITER ) {
@@ -281,23 +279,23 @@ int main(int argc, char *argv[])
   theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
   for(int k = 0; k < K; k++) {              // Principle Component Analysis
     std::vector<int> Nonzeros = find( gamma_ind, k );
-    //      std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
     for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
     {
       Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
     }
-    lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), M, 1.0e-6, 200, EOFs[k], true);
+    lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), M, 1.0e-8, Ntl, EOFs[k], true);
   }
-  L_value_new =  L_value( gamma_ind, EOFs, X, theta ); 
+  L_value_new =  L_value( gamma_ind, EOFs, X, theta );
   if (!my_rank) std::cout << "L value final " << L_value_new << std::endl;
 
 //
 //  Terminate MPI.
 //
+#endif
   retval =  0;
   if (!my_rank) std::cout << "retval " << retval << std::endl;
 
-  MPI::Finalize ( );
+  MPI_Finalize ( );
 
   return 0;
 }

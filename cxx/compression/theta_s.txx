@@ -14,7 +14,7 @@
 	 */
 
 template <typename ScalarType>
-void theta_s(const ArrayX1i &gamma_ind, const MatrixXX &X, MatrixXX &theta )
+void theta_s(const ArrayX1i &gamma_ind, const MatrixXXrow &X, MatrixXX &theta )
 {
   const int Ntl = theta.rows();
   const int K  = theta.cols();
@@ -33,16 +33,15 @@ void theta_s(const ArrayX1i &gamma_ind, const MatrixXX &X, MatrixXX &theta )
     std::vector<int> Nonzeros = find( gamma_ind, k );   // Could use a matrix for this to avoid 2nd load;
     ScalarType sum_gamma;   // Number of entries containing each index
     sum_gamma = static_cast<ScalarType> (global_nbr_nonzeros[k]);
-    // std::cout << "k " << k << " nonzeros " << sum_gamma << " " << Nonzeros[0] << " " << Nonzeros[1] << " " << Nonzeros[2] << std::endl;
+    // std::cout << " k " << k << " nonzeros " << sum_gamma << std::endl;
     if ( sum_gamma > 0 ) {
       //  std::cout << "Norm of first X column " << X.col(Nonzeros[0]).norm() << std::endl;
-      local_theta.col(k) = X.col(Nonzeros[0]); 
-      for (int m = 1; m < Nonzeros.size() ; m++ ) {
+      local_theta.col(k) =  MatrixXd::Zero(Ntl, 1);
+      for (int m = 0; m < Nonzeros.size() ; m++ ) {
         local_theta.col(k) += X.col(Nonzeros[m]);  
       }
-      theta.col(k) /= sum_gamma;
+      local_theta.col(k) /= sum_gamma;
     }
   }
   MPI_Allreduce( local_theta.data(), theta.data(), Ntl*K, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
-  // std::cout << "Norm of theta column(0)= " << theta.col(0).norm() << " should be same on all PEs " << std::endl;
 }

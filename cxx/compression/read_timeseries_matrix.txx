@@ -17,7 +17,7 @@
 #define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(ERRCODE);}
 
 template <typename ScalarType>
-MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields, const int iam_in_x, const int iam_in_y, const int pes_in_x, const int pes_in_y )
+ScalarType* read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields, const int iam_in_x, const int iam_in_y, const int pes_in_x, const int pes_in_y, int &rows, int &cols )
 {
   int ncid, varid;
   int ndims;
@@ -72,21 +72,19 @@ MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<st
     start[i] = 0;
     count[i] = dims[i];
   }
-  // Last two dimensions are distributed, assumes that dimensions are divisible by decomposition\
+  // Last two dimensions are distributed, assumes that dimensions are divisible by decomposition
 
   
   if (dims[ndims-2] % pes_in_x != 0) {
       if (!my_rank) std::cout << "dims[ndims-2] " << dims[ndims-2] << " is not divisible by pes_in_x = " << pes_in_x << std::endl;
-      static Matrix<ScalarType,0,0> empty_vector;
-      return empty_vector;
+      return NULL;
   } 
   start[ndims-2] = iam_in_x * ( dims[ndims-2] / pes_in_x );
   count[ndims-2] = dims[ndims-2] / pes_in_x; 
 
   if (dims[ndims-1] % pes_in_y != 0) {
       if (!my_rank) std::cout << "dims[ndims-1] " << dims[ndims-1] << " is not divisible by pes_in_y = " << pes_in_y << std::endl;
-      static Matrix<ScalarType,0,0> empty_vector;
-      return empty_vector;
+      return NULL;
   } 
   start[ndims-1] = iam_in_y * ( dims[ndims-1] / pes_in_y ) ;
   count[ndims-1] = dims[ndims-1] / pes_in_y; 
@@ -97,31 +95,26 @@ MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<st
   data  = (ScalarType*) malloc (sizeof(ScalarType)*slab_size);
 
   /* Read the slab this process is responsible for. */
-  std::cout << "Rank: " << my_rank << " reading count " << count[0] << count[1] << count[2] << count[3] << " start " << start[0] << start[1] << start[2] << start[3] << std::endl;
+  std::cout << "Rank: " << my_rank << " reading count " << count[0] << " " << count[1] << " " << count[2] << " " << count[3] << " start " << start[0] << start[1] << start[2] << start[3] << std::endl;
   /* Read one slab of data. */
   if ((retval = nc_get_vara_double(ncid, varid, start, count, data))) ERR(retval);
 
-  int dim1, dim2;
-
   switch (ndims) 
   { 
-    case 2:  dim1 = count[0]; dim2 = count[1]; break;
-    case 3:  dim1 = count[0]; dim2 = count[1]*count[2]; break;
-    case 4:  dim1 = count[0]*count[1]; dim2 = count[2]*count[3]; break;
+    case 2:  cols = count[0]; cols = count[1]; break;
+    case 3:  rows = count[0]; cols = count[1]*count[2]; break;
+    case 4:  rows = count[0]*count[1]; cols = count[2]*count[3]; break;
     default: std::cout << "Number dimensions " << ndims << " not supported " << std::endl; break;
   }
 
-  // std::cout << "Creating eigen matrix " << dim1 << " X " << dim2 << std::endl;
-  Map<MatrixXX> output(data,dim2,dim1); 
   free( dims );
   free( dimids );
   free( start );
   free( count );
-  //  free( data );   // Cannot free data, since it is now bound to the Matrix instantiation "output"
 
   /* Close the file, freeing all resources. */
   if ((retval = nc_close(ncid)))
     ERR(retval);
 
-  return output.transpose();   // We want time x levels to be in the first dimension; horizontal dimensions in second
+  return data;
 }

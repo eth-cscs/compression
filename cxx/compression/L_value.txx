@@ -8,7 +8,7 @@
 	   @return                    Norm (ScalarType)
 	 */
 
-ScalarType L_value( const ArrayX1i &gamma_ind, const MatrixXX *EOFs, const MatrixXX &X, const MatrixXX &theta )
+ScalarType L_value( const ArrayX1i &gamma_ind, const MatrixXX *EOFs, const MatrixXXrow &X, const MatrixXX &theta )
 {
   ScalarType value  = 0.0;
   ScalarType output = 0.0;
