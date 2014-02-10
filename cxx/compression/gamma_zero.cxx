@@ -6,14 +6,14 @@
 	   @return                    Array containing indices of probability 1
 	 */
 
-ArrayX1i gamma_zero(const int *nl_global, const int my_rank, const int K )
+std::vector<int> gamma_zero(const int *nl_global, const int my_rank, const int K )
 {
-  ArrayX1i random_vector(nl_global[my_rank]);
+  std::vector<int> random_vector(nl_global[my_rank]);
   int start = 0; 
   for ( int rank=0; rank < my_rank; rank++ ) { start += nl_global[rank]; }
 
   for ( int l=0; l < nl_global[my_rank] ; l++ ) {
-    random_vector(l) = (l+start)%K;
+    random_vector[l] = (l+start)%K;
   }
 
   //  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", " << ", ";");

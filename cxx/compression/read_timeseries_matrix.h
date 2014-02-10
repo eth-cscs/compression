@@ -1,4 +1,3 @@
-#include <Eigen/Dense>
 #include <vector>
 //
 //
@@ -6,9 +5,7 @@
 #include <netcdf_par.h>
 #include <netcdf.h>
 //
-using namespace Eigen;
-//
 template <typename ScalarType>
-MatrixXX read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields );
+ScalarType* read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields );
 
 #include "read_timeseries_matrix.txx"

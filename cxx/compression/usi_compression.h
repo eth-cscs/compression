@@ -1,11 +1,11 @@
 #ifndef _USI_COMPRESSION_H
 #define _USI_COMPRESSION_H
 
+typedef double ScalarType;     // feel free to change this to 'double' if supported by your hardware
+
 #if defined( USE_EIGEN )
 #include <Eigen/Dense>
 using namespace Eigen;
-
-typedef double ScalarType;     // feel free to change this to 'double' if supported by your hardware
 
 typedef Matrix<ScalarType, Dynamic, Dynamic, RowMajor> MatrixXXrow;
 typedef Matrix<ScalarType, Dynamic, Dynamic, ColMajor> MatrixXX;
