@@ -22,16 +22,8 @@ void lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   assert(EV.cols() == ne);
   assert(N         >= max_iter);
 
-  GenericColMatrix V  = GenericColMatrix::Zero(N,max_iter);  // transformation
-  GenericColMatrix Trid  = GenericColMatrix::Zero(max_iter,max_iter);  // Tridiagonal
+  GenericColMatrix V(N,max_iter);  // transformation
 
-  V.col(0).setOnes();     // Simple initial vector; no apparent side effects
-/*  
-  V.col(0).setRandom();   // Warning:  all nodes must generate same random vector in parallel (utilize the seed; but how is this done in Eigen?)
-*/
-  V.col(0) /= V.col(0).norm();    // Unit vector
-
-  // find product w=A*V(:,0)
   GenericVector w(N);
 
   // preallocate storage vectors
@@ -39,10 +31,20 @@ void lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   GenericVector tmp_vector(N);   // temporary
 
 #if defined( USE_EIGEN )      
+  V.col(0).setOnes();     // Simple initial vector; no apparent side effects
+/*  
+  V.col(0).setRandom();   // Warning:  all nodes must generate same random vector in parallel (utilize the seed; but how is this done in Eigen?)
+*/
+  V.col(0) /= V.col(0).norm();    // Unit vector
+  GenericColMatrix Trid = GenericColMatrix::Zero(max_iter,max_iter);  // Tridiagonal
   tmp_vector = Xtranslated*(Xtranslated.transpose()*V.col(0));  // order important! evaluate right to left to save calculation!
   MPI_Allreduce( tmp_vector.data(), w.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
   delta = w.transpose() * V.col(0);
 #elif defined( USE_MINLIN )
+  V(all,0) = ScalarType(1.);
+  V(all,0) /= norm(V(all,0));    // Unit vector
+  GenericColMatrix Trid(max_iter,max_iter);  // Tridiagonal
+  Trid(all) = 0.;                            // Matrix must be zeroed out
   GenericVector tmp_ne(ne);
   gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated.pointer(), 1., 0., 'T' );
   gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated.pointer(), 1., 0., 'N' );

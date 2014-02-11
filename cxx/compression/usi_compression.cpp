@@ -234,7 +234,6 @@ int main(int argc, char *argv[])
   // std::copy(gamma_initial.begin(), gamma_initial.end(), gamma_ind.data());
   MatrixXX theta(Ntl,KSIZE);                   // Time series means (one for each k), allocate outside loop
   // MatrixXX theta = MatrixXX::Zero(Ntl,KSIZE);                   // Time series means (one for each k), allocate outside loop
-  MatrixXX Xtranslated( Ntl, nl ) ;    // Maximum size for worst case (all nl in one KSIZE)
   MatrixXX eigenvectors( Ntl, 1 ) ;    // Only one eigenvector for the iteration stage
   std::vector<MatrixXX> TT(KSIZE, MatrixXX::Zero(Ntl,1));
   std::vector<MatrixXX> EOFs(KSIZE, MatrixXX::Zero(Ntl,MSIZE));
@@ -246,7 +245,6 @@ int main(int argc, char *argv[])
   // std::copy(gamma_initial.begin(), gamma_initial.end(), gamma_ind.pointer());
   HostMatrix<ScalarType> theta(Ntl,KSIZE);      // Time series means (one for each k), allocate outside loop
   theta(all) = 0.;   // Check if this is necessary
-  HostMatrix<ScalarType> Xtranslated( Ntl, nl ) ;   // Maximum size for worst case (all nl in one KSIZE)
   HostMatrix<ScalarType> eigenvectors( Ntl, 1 ) ;   // Only one eigenvector for the iteration stage
 
   std::vector<HostMatrix<ScalarType>> TT(KSIZE,HostMatrix<ScalarType>(Ntl,1) );
@@ -267,6 +265,7 @@ int main(int argc, char *argv[])
     // if ( iter > 0 ) { std::cout << "L value after theta determination " << L_value( gamma_ind, TT, X, theta ) << std::endl; }
     for(int k = 0; k < KSIZE; k++) {              // Principle Component Analysis
       std::vector<int> Nonzeros = find( gamma_ind, k );
+      GenericColMatrix Xtranslated( Ntl, Nonzeros.size() ) ;
       // if (!my_rank) std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
       for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
       {
@@ -278,9 +277,8 @@ int main(int argc, char *argv[])
         ERROR:  must USE_EIGEN or USE_MINLIN
 #endif
       }
-#if defined( USE_EIGEN )
-      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-13, 50, TT[k], true);
-#endif
+      //      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-13, 50, TT[k], true);
+      lanczos_correlation(Xtranslated, 1, 1.0e-13, 50, TT[k], true);
     }
     L_value_new =  L_value( gamma_ind, TT, X, theta ); 
     if (!my_rank) std::cout << "L value after PCA " << L_value_new << std::endl;
@@ -307,11 +305,13 @@ int main(int argc, char *argv[])
   theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
   for(int k = 0; k < KSIZE; k++) {              // Principle Component Analysis
     std::vector<int> Nonzeros = find( gamma_ind, k );
+    GenericColMatrix Xtranslated( Ntl, Nonzeros.size() ) ;
     for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
     {
       Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
     }
-    lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), MSIZE, 1.0e-8, Ntl, EOFs[k], true);
+    // lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), MSIZE, 1.0e-8, Ntl, EOFs[k], true);
+    lanczos_correlation(Xtranslated, MSIZE, 1.0e-8, Ntl, EOFs[k], true);
   }
   L_value_new =  L_value( gamma_ind, EOFs, X, theta );
   if (!my_rank) std::cout << "L value final " << L_value_new << std::endl;
