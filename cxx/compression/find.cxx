@@ -13,10 +13,10 @@
 	 */
 
 //Array<int, Dynamic, 1> find(const Array<int, Dynamic, 1> int_vector, const int k)
-std::vector<int> find(const Array<int, Dynamic, 1> int_vector, const int k)
+std::vector<int> find(const std::vector<int> int_vector, const int k)
 {
   std::vector<int> found_items;
-  for (int i=0; i<int_vector.rows(); i++) {
+  for (int i=0; i<int_vector.size(); i++) {
     if (int_vector[i] == k) { found_items.push_back(i); }
   }
   return found_items;

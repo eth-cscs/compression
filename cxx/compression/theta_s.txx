@@ -14,11 +14,11 @@
 	 */
 
 template <typename ScalarType>
-void theta_s(const ArrayX1i &gamma_ind, const MatrixXXrow &X, MatrixXX &theta )
+void theta_s(const std::vector<int> &gamma_ind, const GenericRowMatrix &X, GenericColMatrix &theta )
 {
   const int Ntl = theta.rows();
   const int K  = theta.cols();
-  MatrixXX  local_theta(Ntl,K);
+  GenericColMatrix local_theta(Ntl,K);
   std::vector<int> local_nbr_nonzeros( K ), global_nbr_nonzeros( K );
 
   // This loop is parallel: No dependencies between the columns  (local_vector needs to be private)
@@ -36,12 +36,28 @@ void theta_s(const ArrayX1i &gamma_ind, const MatrixXXrow &X, MatrixXX &theta )
     // std::cout << " k " << k << " nonzeros " << sum_gamma << std::endl;
     if ( sum_gamma > 0 ) {
       //  std::cout << "Norm of first X column " << X.col(Nonzeros[0]).norm() << std::endl;
+#if defined( USE_EIGEN )
       local_theta.col(k) =  MatrixXd::Zero(Ntl, 1);
       for (int m = 0; m < Nonzeros.size() ; m++ ) {
         local_theta.col(k) += X.col(Nonzeros[m]);  
       }
       local_theta.col(k) /= sum_gamma;
+#elif defined( USE_MINLIN )
+      local_theta(all,k) =  0.;
+      for (int m = 0; m < Nonzeros.size() ; m++ ) {
+        local_theta(all,k) += X(all,Nonzeros[m]);  
+      }
+      local_theta(all,k) /= sum_gamma;
+#else
+      ERROR:  must USE_EIGEN or USE_MINLIN
+#endif
     }
   }
+#if defined( USE_EIGEN )
   MPI_Allreduce( local_theta.data(), theta.data(), Ntl*K, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+#elif defined( USE_MINLIN )
+  MPI_Allreduce( local_theta.pointer(), theta.pointer(), Ntl*K, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+#else
+  ERROR:  must USE_EIGEN or USE_MINLIN
+#endif
 }

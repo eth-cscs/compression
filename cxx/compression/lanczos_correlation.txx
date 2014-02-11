@@ -12,7 +12,7 @@
 	 */
 
 template <typename ScalarType>
-void lanczos_correlation(const MatrixXX &Xtranslated, const int ne, const ScalarType tol, const int max_iter, MatrixXX &EV, bool reorthogonalize=false)
+void lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericColMatrix &EV, bool reorthogonalize=false)
 {
   int N = Xtranslated.rows();
   ScalarType gamma, delta;
@@ -22,8 +22,8 @@ void lanczos_correlation(const MatrixXX &Xtranslated, const int ne, const Scalar
   assert(EV.cols() == ne);
   assert(N         >= max_iter);
 
-  MatrixXX V  = MatrixXX::Zero(N,max_iter);  // transformation
-  MatrixXX Trid  = MatrixXX::Zero(max_iter,max_iter);  // Tridiagonal
+  GenericColMatrix V  = GenericColMatrix::Zero(N,max_iter);  // transformation
+  GenericColMatrix Trid  = GenericColMatrix::Zero(max_iter,max_iter);  // Tridiagonal
 
   V.col(0).setOnes();     // Simple initial vector; no apparent side effects
 /*  
@@ -32,16 +32,25 @@ void lanczos_correlation(const MatrixXX &Xtranslated, const int ne, const Scalar
   V.col(0) /= V.col(0).norm();    // Unit vector
 
   // find product w=A*V(:,0)
-  VectorX w(N);
-  VectorX tmp_vector = Xtranslated*(Xtranslated.transpose()*V.col(0));  // order important! evaluate right to left to save calculation!
-  MPI_Allreduce( tmp_vector.data(), w.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
-
-
-  delta = w.transpose() * V.col(0);
-  Trid(0,0) = delta;  // store in tridiagonal matrix
+  GenericVector w(N);
 
   // preallocate storage vectors
-  VectorX r(N);   // residual, temporary
+  GenericVector r(N);   // residual, temporary
+  GenericVector tmp_vector(N);   // temporary
+
+#if defined( USE_EIGEN )      
+  tmp_vector = Xtranslated*(Xtranslated.transpose()*V.col(0));  // order important! evaluate right to left to save calculation!
+  MPI_Allreduce( tmp_vector.data(), w.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+  delta = w.transpose() * V.col(0);
+#elif defined( USE_MINLIN )
+  GenericVector tmp_ne(ne);
+  gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated.pointer(), 1., 0., 'T' );
+  gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated.pointer(), 1., 0., 'N' );
+  MPI_Allreduce( tmp_vector.pointer(), w.pointer(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+  delta = dot(w, V(all,0));
+#endif
+
+  Trid(0,0) = delta;  // store in tridiagonal matrix
 
   ScalarType convergence_error;
   int iter;
@@ -87,19 +96,19 @@ void lanczos_correlation(const MatrixXX &Xtranslated, const int ne, const Scalar
         if ( j >= ne ) {
             // find eigenvectors/eigenvalues for the reduced triangular system
 #ifdef EIGEN_EIGENSOLVE
-	    SelfAdjointEigenSolver<MatrixXX> eigensolver(Trid.block(0,0,j+1,j+1));
+	    SelfAdjointEigenSolver<GenericColMatrix> eigensolver(Trid.block(0,0,j+1,j+1));
 	    if (eigensolver.info() != Success) abort();
-	    VectorX  eigs = eigensolver.eigenvalues().block(j+1-ne,0,ne,1);  // ne largest Ritz values, sorted ascending
-	    MatrixXX UT = eigensolver.eigenvectors();   // Ritz vectors
+	    GenericVector  eigs = eigensolver.eigenvalues().block(j+1-ne,0,ne,1);  // ne largest Ritz values, sorted ascending
+	    GenericColMatrix UT = eigensolver.eigenvectors();   // Ritz vectors
             // std::cout << "iteration : " << j << ", Tblock : " << Trid.block(0,0,j+1,j+1) << std::endl;
             // std::cout << "iteration : " << j << ", ritz values " << eigs << std::endl;
             // std::cout << "iteration : " << j << ", ritz vectors " << UT << std::endl;
             // j or j+1 ??
 	    EV = V.block(0,0,N,j+1)*UT.block(0,j+1-ne,j+1,ne);  // Eigenvector approximations for largest ne eigenvalues
 #else
-            MatrixXX Tsub = Trid.block(0,0,j+1,j+1);
-	    VectorX  eigs(j+1);
-            MatrixXX UT(j+1,ne);
+            GenericColMatrix Tsub = Trid.block(0,0,j+1,j+1);
+	    GenericVector  eigs(j+1);
+            GenericColMatrix UT(j+1,ne);
             assert( steigs( Tsub.data(), UT.data(), eigs.data(), j+1, ne) );
             EV = V.block(0,0,N,j+1)*UT.block(0,0,j+1,ne);
 #endif
@@ -121,12 +130,12 @@ void lanczos_correlation(const MatrixXX &Xtranslated, const int ne, const Scalar
 
                 // find the residual
                 // r = Xtranslated*( Xtranslated.transpose() * EV.col(count) ) - this_eig*EV.col(count);
-		r = Xtranslated*( Xtranslated.transpose() * EV.col(count) );
+		tmp_vector = Xtranslated*( Xtranslated.transpose() * EV.col(count) );
 
 		// Global summation or matrix product
-	        MPI_Allreduce( r.data(), tmp_vector.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+	        MPI_Allreduce( tmp_vector.data(), r.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
                 // compute the relative error from the residual
-                r = tmp_vector - EV.col(count)*this_eig;   //residual
+                r -= EV.col(count)*this_eig;   //residual
                 ScalarType this_err = std::abs( (r.norm()) / this_eig );
 		max_err = std::max(max_err, this_err);
                 // terminate early if the current error exceeds the tolerance

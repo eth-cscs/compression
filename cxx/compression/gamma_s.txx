@@ -8,7 +8,7 @@
 	   @return                    void
 	 */
 
-void gamma_s( const MatrixXXrow &X, const MatrixXX &theta, const std::vector<MatrixXX> TT, ArrayX1i &gamma_ind )
+void gamma_s( const MatrixXXrow &X, const MatrixXX &theta, const std::vector<MatrixXX> TT, std::vector<int> &gamma_ind )
 {
   const int K  = theta.cols();
   const int Ntl = X.rows();
@@ -31,6 +31,6 @@ void gamma_s( const MatrixXXrow &X, const MatrixXX &theta, const std::vector<Mat
   for(int l = 0; l < nl; l++) {   // Pity that we have to loop through all rows
     std::ptrdiff_t i;
     ScalarType value = colnorm.row(l).minCoeff(&i);
-    gamma_ind(l) = i;   // Only interested in position, not value
+    gamma_ind[l] = i;   // Only interested in position, not value
   }
 }
