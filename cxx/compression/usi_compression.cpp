@@ -28,11 +28,11 @@ using namespace boost::numeric;
 #include "find.h"
 #include "theta_s.h"
 #include "L_value.h"
+#include "lanczos_correlation.h"
 
 #if defined( USE_EIGEN )
 
 #include "gamma_s.h"
-#include "lanczos_correlation.h"
 
 #endif
 
