@@ -4,6 +4,12 @@
 typedef double ScalarType;     // feel free to change this to 'double' if supported by your hardware
 
 #if defined( USE_EIGEN )
+
+#define GET_COLUMN( VARIABLE, COLUMN_NR )  VARIABLE.col(COLUMN_NR)
+#define GET_POINTER( VARIABLE )            VARIABLE.data()
+#define GET_NORM( VARIABLE )               VARIABLE.norm()
+#define DOT_PRODUCT( VECTOR1, VECTOR2 )    VECTOR1.transpose() * VECTOR2
+#define NORM( VECTOR )                     VECTOR.norm()
 #include <Eigen/Dense>
 using namespace Eigen;
 
@@ -16,7 +22,16 @@ typedef MatrixXXrow GenericRowMatrix;
 typedef MatrixXX    GenericColMatrix;
 typedef VectorX     GenericVector;
 // typedef ArrayX1i    GenericIntVector;
+
 #elif defined( USE_MINLIN )
+
+#define MINLIN_DEBUG 1
+
+#define GET_COLUMN( VARIABLE, COLUMN_NR )  VARIABLE(all,COLUMN_NR)
+#define GET_POINTER( VARIABLE )            VARIABLE.pointer()
+#define GET_NORM( VARIABLE )               norm( VARIABLE )
+#define DOT_PRODUCT( VECTOR1, VECTOR2 )    dot( VECTOR1, VECTOR2 )
+#define NORM( VECTOR )                     norm(VECTOR)
 
 #include <minlin/minlin.h>
 #include <minlin/modules/threx/threx.h>
@@ -48,6 +63,25 @@ bool gemv_wrapper( double* y, const double* x, const GenericColMatrix &A, double
   const int n = A.cols();
   const int lda = m;
   dgemv(&trans, &m, &n, &alpha, A.pointer(), &lda, const_cast<double*>(x), &inc, &beta, y, &inc);
+
+  return true;
+#endif
+}
+
+// double precision geru (rank-1 update)
+// A <- A - alpha*x*y'
+bool geru_wrapper( GenericColMatrix &A, const double* x, const double* y, double alpha )
+{
+  const int inc = 1;
+#ifdef USE_GPU
+  cublasHandle_t handle = CublasState::instance()->handle();
+  cublasStatus_t status = cublasDger(handle, A.rows(), A.cols(), &alpha, x, inc, &beta, y, inc, A.pointer(), A.rows(), );
+  return (status==CUBLAS_STATUS_SUCCESS);
+#else
+  const int m = A.rows();
+  const int n = A.cols();
+  const int lda = m;
+  dger(&m, &n, &alpha, const_cast<double*>(x), &inc, const_cast<double*>(y), &inc,  A.pointer(), &lda);
 
   return true;
 #endif

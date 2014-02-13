@@ -12,7 +12,7 @@
 	 */
 
 template <typename ScalarType>
-void lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericColMatrix &EV, bool reorthogonalize=false)
+bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericColMatrix &EV, bool reorthogonalize=false)
 {
   int N = Xtranslated.rows();
   ScalarType gamma, delta;
@@ -45,9 +45,11 @@ void lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   V(all,0) /= norm(V(all,0));    // Unit vector
   GenericColMatrix Trid(max_iter,max_iter);  // Tridiagonal
   Trid(all) = 0.;                            // Matrix must be zeroed out
-  GenericVector tmp_ne(ne);
-  gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated.pointer(), 1., 0., 'T' );
-  gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated.pointer(), 1., 0., 'N' );
+  {
+    GenericVector tmp_ne(ne);
+    gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated, 1., 0., 'T' );
+    gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
+  }
   MPI_Allreduce( tmp_vector.pointer(), w.pointer(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
   delta = dot(w, V(all,0));
 #endif
@@ -58,111 +60,154 @@ void lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   int iter;
 
     // main loop, will terminate earlier if tolerance is reached
-    bool converged = false;
-    for(int j=1; j<max_iter && !converged; ++j) {
-        ////// timing logic //////
-        //double time = -omp_get_wtime();
-        //////////////////////////
-        // std::cout << "================= ITERATION " << j << "    " << std::endl;
+  bool converged = false;
 
-	// The Allreduce here implies that w.data will not be reproducible over all PE configurations.  
-	// a reproducible variant should be provided
+#if defined( USE_EIGEN )
+  for(int j=1; j<max_iter && !converged; ++j) {
+    ////// timing logic //////
+    //double time = -omp_get_wtime();
+    //////////////////////////
+    // std::cout << "================= ITERATION " << j << "    " << std::endl;
 
-        if ( j == 1 )
-            w -= delta*V.col(j-1);
-        else
-            w -= delta*V.col(j-1) + gamma*V.col(j-2);
+    // The Allreduce here implies that w.data will not be reproducible over all PE configurations.  
+    // a reproducible variant should be provided
 
-        gamma = w.norm();
-        V.col(j) = (1./gamma)*w;
+    if ( j == 1 )
+      w -= delta * GET_COLUMN(V,j-1) ;
+    else
+      w -= delta * GET_COLUMN(V,j-1) + gamma * GET_COLUMN(V,j-2);
 
-        // reorthogonalize
-        if( reorthogonalize ) {
-            for( int jj = 0; jj < j; ++jj )  {
-	      ScalarType alpha =  V.col(jj).transpose() * V.col(j) ;
-                V.col(j) -= alpha * V.col(jj);
-            }
-        }
+    gamma = GET_NORM(w);
+    GET_COLUMN(V,j) = (1./gamma)*w;
 
-        // write off-diagonal values in tri-diagonal matrix
-        Trid(j-1,j  ) = gamma;
-        Trid(j  ,j-1) = gamma;
+    // reorthogonalize
+    if( reorthogonalize ) {
+      for( int jj = 0; jj < j; ++jj )  {
+        // ScalarType alpha =  V.col(jj).transpose() * V.col(j) ;
+        ScalarType alpha =  DOT_PRODUCT( GET_COLUMN(V,jj), GET_COLUMN(V,j) ) ;
+        GET_COLUMN(V,j) -= alpha * GET_COLUMN(V,jj);
+      }
+    }
 
-        // find matrix-vector product for next iteration
-        r = Xtranslated*(Xtranslated.transpose()*V.col(j));
-        MPI_Allreduce( r.data(), w.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+    // write off-diagonal values in tri-diagonal matrix
+    Trid(j-1,j  ) = gamma;
+    Trid(j  ,j-1) = gamma;
 
-        // update diagonal of tridiagonal system
-        delta = w.transpose() * V.col(j);
-        Trid(j, j) = delta;
-        if ( j >= ne ) {
-            // find eigenvectors/eigenvalues for the reduced triangular system
-#ifdef EIGEN_EIGENSOLVE
-	    SelfAdjointEigenSolver<GenericColMatrix> eigensolver(Trid.block(0,0,j+1,j+1));
-	    if (eigensolver.info() != Success) abort();
-	    GenericVector  eigs = eigensolver.eigenvalues().block(j+1-ne,0,ne,1);  // ne largest Ritz values, sorted ascending
-	    GenericColMatrix UT = eigensolver.eigenvectors();   // Ritz vectors
-            // std::cout << "iteration : " << j << ", Tblock : " << Trid.block(0,0,j+1,j+1) << std::endl;
-            // std::cout << "iteration : " << j << ", ritz values " << eigs << std::endl;
-            // std::cout << "iteration : " << j << ", ritz vectors " << UT << std::endl;
-            // j or j+1 ??
-	    EV = V.block(0,0,N,j+1)*UT.block(0,j+1-ne,j+1,ne);  // Eigenvector approximations for largest ne eigenvalues
+    // find matrix-vector product for next iteration
+#if defined( USE_EIGEN )
+    r = Xtranslated*(Xtranslated.transpose()*V.col(j));
+#elif defined( USE_MINLIN )
+  {
+    GenericVector tmp_ne(ne);
+    gemv_wrapper( tmp_ne.pointer(), V.pointer()+j*N, Xtranslated, 1., 0., 'T' );
+    gemv_wrapper( r.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
+  }    
 #else
-            GenericColMatrix Tsub = Trid.block(0,0,j+1,j+1);
-	    GenericVector  eigs(j+1);
-            GenericColMatrix UT(j+1,ne);
-            assert( steigs( Tsub.data(), UT.data(), eigs.data(), j+1, ne) );
-            EV = V.block(0,0,N,j+1)*UT.block(0,0,j+1,ne);
+    ERROR:  -DUSE_EIGEN or -DUSE_MINLIN
+#endif
+    MPI_Allreduce( GET_POINTER(r), GET_POINTER(w), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+
+    // update diagonal of tridiagonal system
+    delta = DOT_PRODUCT( w, GET_COLUMN(V,j) );
+    Trid(j, j) = delta;
+    if ( j >= ne ) {
+      // find eigenvectors/eigenvalues for the reduced triangular system
+#if defined( USE_EIGEN )
+
+#if defined( EIGEN_EIGENSOLVE )
+      SelfAdjointEigenSolver<GenericColMatrix> eigensolver(Trid.block(0,0,j+1,j+1));
+      if (eigensolver.info() != Success) abort();
+      GenericVector  eigs = eigensolver.eigenvalues().block(j+1-ne,0,ne,1);  // ne largest Ritz values, sorted ascending
+      GenericColMatrix UT = eigensolver.eigenvectors();   // Ritz vectors
+      // std::cout << "iteration : " << j << ", Tblock : " << Trid.block(0,0,j+1,j+1) << std::endl;
+      // std::cout << "iteration : " << j << ", ritz values " << eigs << std::endl;
+      // std::cout << "iteration : " << j << ", ritz vectors " << UT << std::endl;
+      // j or j+1 ??
+      EV = V.block(0,0,N,j+1)*UT.block(0,j+1-ne,j+1,ne);  // Eigenvector approximations for largest ne eigenvalues
+#else
+      GenericColMatrix Tsub = Trid.block(0,0,j+1,j+1);
+      GenericColMatrix UT(j+1,ne);
+      GenericVector  eigs(j+1);
+      assert( steigs( Tsub.data(), UT.data(), eigs.data(), j+1, ne) );
+      EV = V.block(0,0,N,j+1)*UT.block(0,0,j+1,ne);
+#endif
+
+#elif defined( USE_MINLIN )
+
+      GenericVector  eigs(j+1);
+      {
+        HostMatrix<ScalarType> Tsub = Trid(0,j,0,j);
+        HostMatrix<ScalarType> UVhost(j+1,ne);
+        HostVector<ScalarType> er(j+1);        // ScalarType components of eigenvalues
+        HostVector<ScalarType> ei(j+1);        // imaginary components of eigenvalues
+#ifdef FULL_EIGENSOLVE
+        assert( geev<ScalarType>(Tsub, UVhost, er, ei, ne) );
+#else
+        assert( steigs( Tsub.pointer(), UVhost.pointer(), er.pointer(), j+1, ne) );
+#endif
+        // copy eigenvectors for reduced system to the device
+        GenericColMatrix UV = UVhost;
+
+        // find approximate eigenvectors of full system
+        EV = V(all,0,j)*UV;
+      }
+
+#else
+      ERROR:  -DUSE_EIGEN or -DUSE_MINLIN
 #endif
 
 
-            // copy eigenvectors for reduced system to the device
-            ////////////////////////////////////////////////////////////////////
-            // TODO : can we find a way to allocate memory for UV outside the
-            //        inner loop? this memory allocation is probably killing us
-            //        particularly if we go to large subspace sizes
-            //
-            ////////////////////////////////////////////////////////////////////
+      // copy eigenvectors for reduced system to the device
+      ////////////////////////////////////////////////////////////////////
+      // TODO : can we find a way to allocate memory for UV outside the
+      //        inner loop? this memory allocation is probably killing us
+      //        particularly if we go to large subspace sizes
+      //
+      ////////////////////////////////////////////////////////////////////
 
-            ScalarType max_err = 0.;
-            const int boundary = j+1-ne;
-            for(int count=ne-1; count>=0 && !converged; count--){
-                ScalarType this_eig = eigs(count);
-                // std::cout << "iteration : " << j << ", this_eig : " << this_eig << std::endl;
+      ScalarType max_err = 0.;
+      const int boundary = j+1-ne;
+      for(int count=ne-1; count>=0 && !converged; count--){
+        ScalarType this_eig = eigs(count);
+        // std::cout << "iteration : " << j << ", this_eig : " << this_eig << std::endl;
 
-                // find the residual
-                // r = Xtranslated*( Xtranslated.transpose() * EV.col(count) ) - this_eig*EV.col(count);
-		tmp_vector = Xtranslated*( Xtranslated.transpose() * EV.col(count) );
+        // find the residual
+        // r = Xtranslated*( Xtranslated.transpose() * EV.col(count) ) - this_eig*EV.col(count);
+#if defined( USE_EIGEN )
+        tmp_vector = Xtranslated*( Xtranslated.transpose() * EV.col(count) );  // TODO: MINLIN
+#elif defined( USE_MINLIN )
+        {
+          GenericVector tmp_ne(ne);
+          gemv_wrapper( tmp_ne.pointer(), EV.pointer()+count*N, Xtranslated, 1., 0., 'T' );
+          gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
+        }    
+#else
+        ERROR:  -DUSE_EIGEN or -DUSE_MINLIN
+#endif
+        // Global summation or matrix product
+        MPI_Allreduce( GET_POINTER(tmp_vector), GET_POINTER(r), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+        // compute the relative error from the residual
+        r -= GET_COLUMN(EV,count) * this_eig;   //residual
+        ScalarType this_err = std::abs( NORM(r) / this_eig );
+        max_err = std::max(max_err, this_err);
+        // terminate early if the current error exceeds the tolerance
+        if(max_err > tol)
+          break;
+      } // end-for error estimation
+      // std::cout << "iteration : " << j << ", max_err : " << max_err << std::endl;
+      // test for convergence
+      if(max_err < tol) {
+        converged = true;
+      }
+    } // end-if estimate eigenvalues
+    ////// timing logic //////
+    //time += omp_get_wtime();
+    //std::cout << "took " << time*1000. << " miliseconds" << std::endl;
+    //////////////////////////
+  } // end-for main
+  // return failure if no convergence
+#endif
 
-		// Global summation or matrix product
-	        MPI_Allreduce( tmp_vector.data(), r.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
-                // compute the relative error from the residual
-                r -= EV.col(count)*this_eig;   //residual
-                ScalarType this_err = std::abs( (r.norm()) / this_eig );
-		max_err = std::max(max_err, this_err);
-                // terminate early if the current error exceeds the tolerance
-                if(max_err > tol)
-                    break;
-            } // end-for error estimation
-            // std::cout << "iteration : " << j << ", max_err : " << max_err << std::endl;
-            // test for convergence
-            if(max_err < tol) {
-	      converged = true;
-	    }
-        } // end-if estimate eigenvalues
-        ////// timing logic //////
-        //time += omp_get_wtime();
-        //std::cout << "took " << time*1000. << " miliseconds" << std::endl;
-        //////////////////////////
-    } // end-for main
-
-    // return failure if no convergence
-
-/*
-    if(!converged)
-      return false;
-    else
-      return true;
-*/
+  return (!converged);
 
 }

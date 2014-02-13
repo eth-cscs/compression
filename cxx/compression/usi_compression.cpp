@@ -29,10 +29,9 @@ using namespace boost::numeric;
 #include "theta_s.h"
 #include "L_value.h"
 #include "lanczos_correlation.h"
+#include "gamma_s.h"
 
 #if defined( USE_EIGEN )
-
-#include "gamma_s.h"
 
 #endif
 
@@ -228,34 +227,14 @@ int main(int argc, char *argv[])
   // std::cout << std::endl;
 
   std::vector<int> gamma_ind = gamma_zero(nl_global, my_rank, KSIZE ); // Needs to be generated in a consistent way for any PE configuration
-#if defined( USE_EIGEN )
-  // ArrayX1i gamma_ind(gamma_initial.data());  // Error:  YOU_CALLED_A_FIXED_SIZE_METHOD_ON_A_DYNAMIC_SIZE_MATRIX_OR_VECTOR
-  // ArrayX1i gamma_ind(gamma_initial.size()) ;
-  // std::copy(gamma_initial.begin(), gamma_initial.end(), gamma_ind.data());
-  MatrixXX theta(Ntl,KSIZE);                   // Time series means (one for each k), allocate outside loop
-  // MatrixXX theta = MatrixXX::Zero(Ntl,KSIZE);                   // Time series means (one for each k), allocate outside loop
-  MatrixXX eigenvectors( Ntl, 1 ) ;    // Only one eigenvector for the iteration stage
-  std::vector<MatrixXX> TT(KSIZE, MatrixXX::Zero(Ntl,1));
-  std::vector<MatrixXX> EOFs(KSIZE, MatrixXX::Zero(Ntl,MSIZE));
-#elif defined( USE_MINLIN )
 
-#if defined( USE_GPU )
-#else
-  // HostVector<int> gamma_ind(gamma_initial.size());   // Needs to be generated in a consistent way for any PE configuration
-  // std::copy(gamma_initial.begin(), gamma_initial.end(), gamma_ind.pointer());
-  HostMatrix<ScalarType> theta(Ntl,KSIZE);      // Time series means (one for each k), allocate outside loop
-  theta(all) = 0.;   // Check if this is necessary
-  HostMatrix<ScalarType> eigenvectors( Ntl, 1 ) ;   // Only one eigenvector for the iteration stage
-
-  std::vector<HostMatrix<ScalarType>> TT(KSIZE,HostMatrix<ScalarType>(Ntl,1) );
-  TT[0](all) = 0.;
-  std::vector<HostMatrix<ScalarType>> EOFs(KSIZE,HostMatrix<ScalarType>(Ntl,MSIZE) );
-#endif
-  
-#endif
+  GenericColMatrix theta(Ntl,KSIZE);                   // Time series means (one for each k), allocate outside loop
+  std::vector<GenericColMatrix> TT(KSIZE,GenericColMatrix(Ntl,1) );        // Eigenvectors: 1-each for each k
+  std::vector<GenericColMatrix> EOFs(KSIZE,GenericColMatrix(Ntl,MSIZE) );  // Eigenvectors: MSIZE eigenvectors for each k
 
   ScalarType L_value_old = 1.0e19;   // Very big value
-  ScalarType L_value_new;  
+  ScalarType L_value_new;
+  bool success;
 
   for ( int iter = 0; iter < MAX_ITER; iter++ ) {
     theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
@@ -269,19 +248,14 @@ int main(int argc, char *argv[])
       // if (!my_rank) std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
       for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
       {
-#if defined( USE_EIGEN )
-	Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
-#elif defined( USE_MINLIN )
-	Xtranslated(all,m) = X(all,Nonzeros[m]) - theta(all,k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
-#else
-        ERROR:  must USE_EIGEN or USE_MINLIN
-#endif
+        GET_COLUMN(Xtranslated,m) = GET_COLUMN(X,Nonzeros[m]) - GET_COLUMN(theta,k) ; 
       }
       //      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-13, 50, TT[k], true);
-      lanczos_correlation(Xtranslated, 1, 1.0e-13, 50, TT[k], true);
+      success = lanczos_correlation(Xtranslated, 1, 1.0e-13, 50, TT[k], true);
     }
     L_value_new =  L_value( gamma_ind, TT, X, theta ); 
     if (!my_rank) std::cout << "L value after PCA " << L_value_new << std::endl;
+
 #if defined( USE_EIGEN )
     gamma_s( X, theta, TT, gamma_ind );
     L_value_new =  L_value( gamma_ind, TT, X, theta ); 

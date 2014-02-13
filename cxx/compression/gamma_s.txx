@@ -8,29 +8,39 @@
 	   @return                    void
 	 */
 
-void gamma_s( const MatrixXXrow &X, const MatrixXX &theta, const std::vector<MatrixXX> TT, std::vector<int> &gamma_ind )
+void gamma_s( const GenericRowMatrix &X, const GenericColMatrix &theta, const std::vector<GenericColMatrix> TT, std::vector<int> &gamma_ind )
 {
-  const int K  = theta.cols();
+  const int K   = theta.cols();
   const int Ntl = X.rows();
-  const int nl = X.cols();
+  const int nl  = X.cols();
 
-  MatrixXX Xtranslated( Ntl, nl ) ;
-  MatrixXX colnorm( nl, K ) ;
+  std::vector<ScalarType> gamma_min(nl, std::numeric_limits<ScalarType>::max());
+
+  GenericColMatrix Xtranslated( Ntl, nl ) ;
+  GenericColMatrix colnorm( nl, K ) ;
 
 // This loop can be multithreaded, if all threads have a separate copy of Xtranslated
   for(int k = 0; k < K; k++) {
 // This loop can be multithreaded!
-    for(int l = 0; l < nl; l++) { Xtranslated.col(l) = X.col(l) - theta.col(k); }  // translate each column of X
+    for(int l = 0; l < nl; l++) { GET_COLUMN(Xtranslated,l) = GET_COLUMN(X,l) - GET_COLUMN(theta,k); }  // translate each column of X
+#if defined( USE_EIGEN )
     Xtranslated -= TT[k] * ( TT[k].transpose() * Xtranslated );
-// This loop can be multithreaded!
-    for(int l = 0; l < nl; l++) { colnorm(l,k) = Xtranslated.col(l).norm(); }  // translate each column of X
-  }
-
-//   std::cout << "row 1 of colnorm is " << colnorm.row(1) << " rows " << colnorm.rows() << " cols " << colnorm.cols() << std::endl;
-// This loop can be multithreaded!
-  for(int l = 0; l < nl; l++) {   // Pity that we have to loop through all rows
-    std::ptrdiff_t i;
-    ScalarType value = colnorm.row(l).minCoeff(&i);
-    gamma_ind[l] = i;   // Only interested in position, not value
+#elif defined( USE_MINLIN )
+    {
+      GenericVector tmp_nl(nl);
+      gemv_wrapper( tmp_nl.pointer(), TT[k].pointer(), Xtranslated, 1., 0., 'T' );
+      geru_wrapper( Xtranslated, TT[k].pointer(), tmp_nl.pointer(), -1.);
+    }
+#else
+    ERROR:  -DUSE_EIGEN or -DUSE_MINLIN
+#endif
+    for(int l = 0; l < nl; l++) {
+      ScalarType this_min = NORM( GET_COLUMN(Xtranslated,l) );  // translate each column of X
+      if(this_min<gamma_min[l])
+      {
+        gamma_min[l] = this_min;
+        gamma_ind[l] = k;
+      }
+    }
   }
 }
