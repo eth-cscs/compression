@@ -16,6 +16,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
 {
   int N = Xtranslated.rows();
   ScalarType gamma, delta;
+  bool converged = false;
 
   // check that output matrix has correct dimensions
   assert(EV.rows() == N);
@@ -41,12 +42,14 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   MPI_Allreduce( tmp_vector.data(), w.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
   delta = w.transpose() * V.col(0);
 #elif defined( USE_MINLIN )
+  GenericVector er(max_iter);        // ScalarType components of eigenvalues
+  GenericVector ei(max_iter);        // imaginary components of eigenvalues
   V(all,0) = ScalarType(1.);
   V(all,0) /= norm(V(all,0));    // Unit vector
   GenericColMatrix Trid(max_iter,max_iter);  // Tridiagonal
   Trid(all) = 0.;                            // Matrix must be zeroed out
   {
-    GenericVector tmp_ne(ne);
+    GenericVector tmp_ne(Xtranslated.cols());
     gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated, 1., 0., 'T' );
     gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
   }
@@ -60,9 +63,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   int iter;
 
     // main loop, will terminate earlier if tolerance is reached
-  bool converged = false;
 
-#if defined( USE_EIGEN )
   for(int j=1; j<max_iter && !converged; ++j) {
     ////// timing logic //////
     //double time = -omp_get_wtime();
@@ -89,6 +90,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
       }
     }
 
+    
     // write off-diagonal values in tri-diagonal matrix
     Trid(j-1,j  ) = gamma;
     Trid(j  ,j-1) = gamma;
@@ -98,7 +100,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
     r = Xtranslated*(Xtranslated.transpose()*V.col(j));
 #elif defined( USE_MINLIN )
   {
-    GenericVector tmp_ne(ne);
+    GenericVector tmp_ne(Xtranslated.cols());
     gemv_wrapper( tmp_ne.pointer(), V.pointer()+j*N, Xtranslated, 1., 0., 'T' );
     gemv_wrapper( r.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
   }    
@@ -134,15 +136,14 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
 
 #elif defined( USE_MINLIN )
 
-      GenericVector  eigs(j+1);
+      GenericVector  eigs(ne);
       {
         HostMatrix<ScalarType> Tsub = Trid(0,j,0,j);
         HostMatrix<ScalarType> UVhost(j+1,ne);
-        HostVector<ScalarType> er(j+1);        // ScalarType components of eigenvalues
-        HostVector<ScalarType> ei(j+1);        // imaginary components of eigenvalues
 #ifdef FULL_EIGENSOLVE
-        assert( geev<ScalarType>(Tsub, UVhost, er, ei, ne) );
+        assert( geev(Tsub.pointer(), UVhost.pointer(), er.pointer(), ei.pointer(), ne) );
 #else
+        std::cout << "j+1 " << j+1 << " ne " << ne << std::endl;
         assert( steigs( Tsub.pointer(), UVhost.pointer(), er.pointer(), j+1, ne) );
 #endif
         // copy eigenvectors for reduced system to the device
@@ -166,24 +167,28 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
       ////////////////////////////////////////////////////////////////////
 
       ScalarType max_err = 0.;
-      const int boundary = j+1-ne;
+
+#if defined( USE_EIGEN )
+        // TODO: sadly Eigen only returns these in ascending order; fix this
       for(int count=ne-1; count>=0 && !converged; count--){
         ScalarType this_eig = eigs(count);
         // std::cout << "iteration : " << j << ", this_eig : " << this_eig << std::endl;
-
-        // find the residual
-        // r = Xtranslated*( Xtranslated.transpose() * EV.col(count) ) - this_eig*EV.col(count);
-#if defined( USE_EIGEN )
         tmp_vector = Xtranslated*( Xtranslated.transpose() * EV.col(count) );  // TODO: MINLIN
 #elif defined( USE_MINLIN )
+      for(int count=0; count<ne && !converged; count++){
+        ScalarType this_eig = er(count);
+        // std::cout << "iteration : " << j << ", this_eig : " << this_eig << std::endl;
         {
-          GenericVector tmp_ne(ne);
+          GenericVector tmp_ne(Xtranslated.cols());
           gemv_wrapper( tmp_ne.pointer(), EV.pointer()+count*N, Xtranslated, 1., 0., 'T' );
           gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
         }    
 #else
         ERROR:  -DUSE_EIGEN or -DUSE_MINLIN
-#endif
+#endif        
+
+        // find the residual
+        // r = Xtranslated*( Xtranslated.transpose() * EV.col(count) ) - this_eig*EV.col(count);
         // Global summation or matrix product
         MPI_Allreduce( GET_POINTER(tmp_vector), GET_POINTER(r), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
         // compute the relative error from the residual
@@ -191,10 +196,11 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
         ScalarType this_err = std::abs( NORM(r) / this_eig );
         max_err = std::max(max_err, this_err);
         // terminate early if the current error exceeds the tolerance
+        // std::cout << "iteration : " << j << " count " << count << ", this_eig : " << this_eig << "max_err" << max_err << std::endl;
+
         if(max_err > tol)
           break;
       } // end-for error estimation
-      // std::cout << "iteration : " << j << ", max_err : " << max_err << std::endl;
       // test for convergence
       if(max_err < tol) {
         converged = true;
@@ -206,7 +212,6 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
     //////////////////////////
   } // end-for main
   // return failure if no convergence
-#endif
 
   return (!converged);
 

@@ -1,3 +1,5 @@
+
+
 /**
 	   Update the gamma index array, using the optimization proposed by Horenko 
 	 
@@ -36,7 +38,7 @@ ScalarType L_value( const std::vector<int> &gamma_ind, const std::vector<Generic
 //     Xtranslated(all,Nonzeros[m]) -=  EOFs[k] * ( transpose(EOFs[k]) * Xtranslated(all,Nonzeros[m]) ); 
       GenericVector tmp( EOFs[k].cols() );
       gemv_wrapper(tmp.pointer(), Xtranslated.pointer() + Ntl*Nonzeros[m], EOFs[k], 1., 0., 'T');
-      gemv_wrapper(Xtranslated.pointer() + Ntl*Nonzeros[m], tmp.pointer(), EOFs[k], 1., 1., 'N');
+      gemv_wrapper(Xtranslated.pointer() + Ntl*Nonzeros[m], tmp.pointer(), EOFs[k], -1., 1., 'N');
 #else
       ERROR:  must USE_EIGEN or USE_MINLIN
 #endif

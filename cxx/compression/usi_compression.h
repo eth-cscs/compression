@@ -1,6 +1,8 @@
 #ifndef _USI_COMPRESSION_H
 #define _USI_COMPRESSION_H
 
+#include <mkl.h>
+
 typedef double ScalarType;     // feel free to change this to 'double' if supported by your hardware
 
 #if defined( USE_EIGEN )
@@ -25,7 +27,9 @@ typedef VectorX     GenericVector;
 
 #elif defined( USE_MINLIN )
 
+#if defined(DEBUG)
 #define MINLIN_DEBUG 1
+#endif
 
 #define GET_COLUMN( VARIABLE, COLUMN_NR )  VARIABLE(all,COLUMN_NR)
 #define GET_POINTER( VARIABLE )            VARIABLE.pointer()

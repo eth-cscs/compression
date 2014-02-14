@@ -8,6 +8,7 @@
 
 #include <random>
 #include <algorithm>
+#include <mpi.h>
 
 #if defined(VIENNACL_WITH_OPENCL) || defined(VIENNACL_WITH_OPENMP) || defined(VIENNACL_WITH_CUDA)
 #define VIENNACL
@@ -31,11 +32,6 @@ using namespace boost::numeric;
 #include "lanczos_correlation.h"
 #include "gamma_s.h"
 
-#if defined( USE_EIGEN )
-
-#endif
-
-#include "mpi.h"
 
 /**
 	   Write description of function here.
@@ -251,12 +247,11 @@ int main(int argc, char *argv[])
         GET_COLUMN(Xtranslated,m) = GET_COLUMN(X,Nonzeros[m]) - GET_COLUMN(theta,k) ; 
       }
       //      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-13, 50, TT[k], true);
-      success = lanczos_correlation(Xtranslated, 1, 1.0e-13, 50, TT[k], true);
+      success = lanczos_correlation(Xtranslated, 1, 1.0e-11, 50, TT[k], true);
     }
     L_value_new =  L_value( gamma_ind, TT, X, theta ); 
     if (!my_rank) std::cout << "L value after PCA " << L_value_new << std::endl;
-
-#if defined( USE_EIGEN )
+    
     gamma_s( X, theta, TT, gamma_ind );
     L_value_new =  L_value( gamma_ind, TT, X, theta ); 
     if (!my_rank) std::cout << "L value after gamma minimization " << L_value_new << std::endl;
@@ -272,17 +267,15 @@ int main(int argc, char *argv[])
       if (!my_rank) std::cout << " Reached maximum number of iterations " << MAX_ITER << " without convergence " << std::endl;
     }
     L_value_old = L_value_new;
-#endif
   }
 
-#if defined( USE_EIGEN)
   theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
   for(int k = 0; k < KSIZE; k++) {              // Principle Component Analysis
     std::vector<int> Nonzeros = find( gamma_ind, k );
     GenericColMatrix Xtranslated( Ntl, Nonzeros.size() ) ;
     for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
     {
-      Xtranslated.col(m) = X.col(Nonzeros[m]) - theta.col(k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
+      GET_COLUMN(Xtranslated,m) = GET_COLUMN(X,Nonzeros[m]) - GET_COLUMN(theta,k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
     }
     // lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), MSIZE, 1.0e-8, Ntl, EOFs[k], true);
     lanczos_correlation(Xtranslated, MSIZE, 1.0e-8, Ntl, EOFs[k], true);
@@ -293,7 +286,7 @@ int main(int argc, char *argv[])
 //
 //  Terminate MPI.
 //
-#endif
+
   retval =  0;
   if (!my_rank) std::cout << "retval " << retval << std::endl;
 
