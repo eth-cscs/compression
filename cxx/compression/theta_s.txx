@@ -17,7 +17,7 @@ template <typename ScalarType>
 void theta_s(const std::vector<int> &gamma_ind, const GenericRowMatrix &X, GenericColMatrix &theta )
 {
   const int Ntl = theta.rows();
-  const int K  = theta.cols();
+  const int K   = theta.cols();
   GenericColMatrix local_theta(Ntl,K);
   std::vector<int> local_nbr_nonzeros( K ), global_nbr_nonzeros( K );
 

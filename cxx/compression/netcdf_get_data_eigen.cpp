@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
 
 #if defined( USE_EIGEN )
   // std::cout << "First row X " << X.block(0,0,Ntl,5) << std::endl;
-  ArrayX1i gamma_ind = gamma_zero(nl_global, my_rank, K );      // Needs to be generated in a consistent way for any PE configuration
+  std::vector<int> gamma_ind = gamma_zero(nl_global, my_rank, K );      // Needs to be generated in a consistent way for any PE configuration
   MatrixXX theta = MatrixXX::Zero(Ntl,K);       // Time series means (one for each k), allocate outside loop
   // MatrixXX TT(Ntl,K);                 // Eigenvectors (one for each k), allocate outside loop
   MatrixXX Xtranslated( Ntl, nl ) ;   // Maximum size for worst case (all nl in one K)

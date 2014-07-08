@@ -130,6 +130,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
       GenericColMatrix Tsub = Trid.block(0,0,j+1,j+1);
       GenericColMatrix UT(j+1,ne);
       GenericVector  eigs(j+1);
+      // TODO:  ensure that eigenvalues have ascending order
       assert( steigs( Tsub.data(), UT.data(), eigs.data(), j+1, ne) );
       EV = V.block(0,0,N,j+1)*UT.block(0,0,j+1,ne);
 #endif

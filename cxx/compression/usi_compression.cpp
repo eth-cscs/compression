@@ -31,7 +31,8 @@ using namespace boost::numeric;
 #include "L_value.h"
 #include "lanczos_correlation.h"
 #include "gamma_s.h"
-
+#include "reduction.h"
+#include "reconstruction.h"
 
 /**
 	   Write description of function here.
@@ -95,16 +96,14 @@ int main(int argc, char *argv[])
 
 
   /* This will be the netCDF ID for the file and data variable. */
-  int ncid, varid, dimid;
-  int ndims, nvars_in, ngatts_in, unlimdimid_in;
+  int ncid_out, varid_out, dimid;
+  int nvars_in, ngatts_in, unlimdimid_in;
   int my_rank, mpi_processes;
 
   /* Loop indexes, and error handling. */
   int x, y, retval ;
   int slab_size ; // is the number of entries in one slab to be read in
 
-  int    *dimids;
-  size_t *dims;
   size_t *p;
   size_t *start, *count;
 
@@ -115,7 +114,10 @@ int main(int argc, char *argv[])
 //
 //  Initialize MPI.
 //
+  double t1, t2, t3, dt_input, dt_solve, size_uncompr, size_compr;
+
   MPI_Init ( &argc, &argv );
+  t1 = MPI_Wtime();   // Start of program
   MPI_Comm comm = MPI_COMM_WORLD;
   MPI_Info info = MPI_INFO_NULL;
 
@@ -194,9 +196,9 @@ int main(int argc, char *argv[])
   std::vector<std::string> fields(argv+2, argv+argc);
   int  Xrows, Xcols;
 
-  ScalarType*  data = read_timeseries_matrix<ScalarType>( filename, fields, iam_in_x, iam_in_y, pes_in_x, pes_in_y, Xrows, Xcols );
+  ScalarType*  data = read_timeseries_matrix<ScalarType>( filename, fields, iam_in_x, iam_in_y, pes_in_x, pes_in_y, Xrows, Xcols, &start, &count, &ncid_out, &varid_out );
 
-  std::cout << "Creating Time Series Matrix " << Xrows << " X " << Xcols << std::endl;
+  // std::cout << "Creating Time Series Matrix " << Xrows << " X " << Xcols << std::endl;
 #if defined( USE_EIGEN )
   Map<MatrixXXrow> X(data,Xrows,Xcols);       // Needs to be row-major to mirror NetCDF output
 #elif defined( USE_MINLIN )
@@ -206,6 +208,7 @@ int main(int argc, char *argv[])
        X(i,j) = *data;
 #endif
 
+  t2 = MPI_Wtime();   // After data have been read in
 
   //
   // want vector of length X.rows() of random values between {0,k-1}
@@ -217,8 +220,14 @@ int main(int argc, char *argv[])
   const int nl =  Xcols;
 
   int *nl_global;
+  int total_nl = 0;
+
   nl_global = (int*) malloc (sizeof(int)*mpi_processes);
   MPI_Allgather( &nl, 1, MPI_INT, nl_global, 1, MPI_INT, MPI_COMM_WORLD);
+  for ( int rank=0; rank < mpi_processes; rank++ ) { total_nl += nl_global[rank]; } 
+
+  size_uncompr = (double) (Ntl * total_nl);
+
   // std::cout << "nl sizes "; for ( int rank=0; rank < mpi_processes; rank++ ) { std::cout << nl_global[rank] << " "; } 
   // std::cout << std::endl;
 
@@ -227,6 +236,9 @@ int main(int argc, char *argv[])
   GenericColMatrix theta(Ntl,KSIZE);                   // Time series means (one for each k), allocate outside loop
   std::vector<GenericColMatrix> TT(KSIZE,GenericColMatrix(Ntl,1) );        // Eigenvectors: 1-each for each k
   std::vector<GenericColMatrix> EOFs(KSIZE,GenericColMatrix(Ntl,MSIZE) );  // Eigenvectors: MSIZE eigenvectors for each k
+  std::vector<GenericColMatrix> Xreduced(KSIZE,GenericColMatrix(MSIZE, nl) );  // Reduced representation of X
+  GenericRowMatrix Xreconstructed(Ntl,nl);                                 // Reconstructed time series 
+  GenericRowMatrix Diff(Ntl,nl);                                 // Reconstructed time series 
 
   ScalarType L_value_old = 1.0e19;   // Very big value
   ScalarType L_value_new;
@@ -282,6 +294,50 @@ int main(int argc, char *argv[])
   }
   L_value_new =  L_value( gamma_ind, EOFs, X, theta );
   if (!my_rank) std::cout << "L value final " << L_value_new << std::endl;
+
+  // Calculated the reduced representation of X
+
+  reduction<ScalarType>( gamma_ind, EOFs, X, theta, Xreduced );
+
+  t3 = MPI_Wtime();   // After data have been read in
+
+  // Calculate the reconstructed X
+
+  reconstruction<ScalarType>( gamma_ind, EOFs, theta, Xreduced, Xreconstructed );
+  ScalarType value  = 0.0;
+  ScalarType output;
+  for (int l = 0; l < nl; l++ ) { 
+#if defined( USE_EIGEN )
+    Diff.col(l) = Xreconstructed.col(l)-X.col(l);
+    ScalarType colnorm = (Xreconstructed.col(l)-X.col(l)).norm(); value += colnorm*colnorm;
+#elif defined( USE_MINLIN )
+    // TODO: MINLIN implementation
+#else
+    ERROR:  must USE_EIGEN or USE_MINLIN
+#endif
+  }  
+  MPI_Allreduce( &value, &output, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+
+
+  t3 -= t2;    // delta time solve
+  t2 -= t1;    // delta time input
+  
+  size_compr = (double) (KSIZE * ( MSIZE + 1) *( Ntl + total_nl ) );
+
+  MPI_Allreduce( &t3, &dt_solve, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
+  MPI_Allreduce( &t2, &dt_input, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
+
+  if (!my_rank) std::cout << "Max time for input " << dt_input << std::endl;
+  if (!my_rank) std::cout << "Max time for solve " << dt_solve << std::endl;
+  if (!my_rank) std::cout << "Compression ratio  " << size_uncompr / size_compr << std::endl;
+  if (!my_rank) std::cout << "Root mean square error " << sqrt( output ) << std::endl;
+
+  
+// OUTPUT
+  if ((retval = nc_put_vara_double(ncid_out, varid_out, start, count, Xreconstructed.data() ))) ERR(retval);
+// OUTPUT FILE will be closed in main program
+  if ((retval = nc_close(ncid_out))) ERR(retval);
+
 
 //
 //  Terminate MPI.
