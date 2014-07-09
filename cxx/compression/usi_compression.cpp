@@ -92,8 +92,6 @@ int main(int argc, char *argv[])
 //    aprun -n 2 ./netcdf_get_data /project/csstaff/outputs/echam/echam6/echam_output/t31_196001.01_echam.nc seaice
 //
 {
-  using namespace std;
-
 
   /* This will be the netCDF ID for the file and data variable. */
   int ncid_out, varid_out, dimid;
