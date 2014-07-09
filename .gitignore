@@ -19,3 +19,10 @@
 *.exe
 *.out
 *.app
+
+# NetCDF files
+*.nc4
+
+# Compiled Project Files
+usi_compression_eigen
+usi_compression_minlin_host
