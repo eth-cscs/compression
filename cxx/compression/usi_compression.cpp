@@ -11,14 +11,6 @@
 #include <algorithm>
 #include <mpi.h>
 
-#if defined(VIENNACL_WITH_OPENCL) || defined(VIENNACL_WITH_OPENMP) || defined(VIENNACL_WITH_CUDA)
-#define VIENNACL
-#include "viennacl/ocl/device.hpp"
-#include "viennacl/ocl/platform.hpp"
-#include "viennacl/scalar.hpp"
-#include "viennacl/vector.hpp"
-#endif
-
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/io.hpp>
 #include <boost/numeric/ublas/assignment.hpp> 
@@ -106,10 +98,6 @@ int main(int argc, char *argv[])
   size_t *p;
   size_t *start, *count;
 
-#if defined(VIENNACL_WITH_OPENCL) || defined(VIENNACL_WITH_OPENMP) || defined(VIENNACL_WITH_CUDA)
-  viennacl::ocl::set_context_device_type(1, viennacl::ocl::gpu_tag());   // Does not find the GPU
-#endif
-
 //
 //  Initialize MPI.
 //
@@ -139,56 +127,6 @@ int main(int argc, char *argv[])
   std::cout << "Decomposition:  pes_in_x " << pes_in_x << " pes_in_y " << pes_in_y << " iam x " << iam_in_x << " iam_in_y " << iam_in_y << std::endl;
 
   if ( pes_in_x * pes_in_y != mpi_processes ) { std::cout << "mpi_processes " << mpi_processes << " not power of two; aborting " << std::endl; abort(); }
-
-
-
-
-#if defined(VIENNACL_WITH_OPENCL) || defined(VIENNACL_WITH_OPENMP) || defined(VIENNACL_WITH_CUDA)
-   typedef std::vector< viennacl::ocl::platform > platforms_type;
-   platforms_type platforms = viennacl::ocl::get_platforms();
-   viennacl::ocl::platform pf = viennacl::ocl::get_platforms()[1];
-
-   //    for (platforms_type::iterator platform_iter = platforms.begin();
-   //                                 platform_iter != platforms.end();
-   //                                ++platform_iter)
-   if (!my_rank)
-   {
-    typedef std::vector<viennacl::ocl::device> devices_type;
-    devices_type devices = pf.devices(CL_DEVICE_TYPE_ALL);
-
-    //
-    // print some platform info
-    //
-    std::cout << "# =========================================" << std::endl;
-    std::cout << "# Platform Information " << std::endl;
-    std::cout << "# =========================================" << std::endl;
-
-    std::cout << "#" << std::endl;
-    std::cout << "# Vendor and version: " << pf.info() << std::endl;
-    std::cout << "#" << std::endl;
-
-    //
-    // traverse the devices and print the information
-    //
-    std::cout << "# " << std::endl;
-    std::cout << "# Available Devices: " << std::endl;
-    std::cout << "# " << std::endl;
-    for(devices_type::iterator iter = devices.begin(); iter != devices.end(); iter++)
-    {
-        std::cout << std::endl;
-
-        std::cout << " -----------------------------------------" << std::endl;
-        std::cout << iter->info();
-        std::cout << " -----------------------------------------" << std::endl;
-    }
-    std::cout << std::endl;
-    std::cout << "###########################################" << std::endl;
-    std::cout << std::endl;
-   }
-#endif
-
-
-   // std::cout << "Parallel execution: my_rank " << my_rank << " out of " << mpi_processes << " processes" << std::endl;
 
 
   std::string              filename(argv[1]);
