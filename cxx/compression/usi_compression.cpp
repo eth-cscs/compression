@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 
   // std::cout << "Creating Time Series Matrix " << Xrows << " X " << Xcols << std::endl;
 #if defined( USE_EIGEN )
-  Map<MatrixXXrow> X(data,Xrows,Xcols);       // Needs to be row-major to mirror NetCDF output
+  Eigen::Map<MatrixXXrow> X(data,Xrows,Xcols);       // Needs to be row-major to mirror NetCDF output
 #elif defined( USE_MINLIN )
   HostMatrix<ScalarType> X(Xrows,Xcols);
   for(int i=0; i<Xrows; i++)

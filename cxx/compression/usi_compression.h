@@ -13,11 +13,10 @@ typedef double ScalarType;     // feel free to change this to 'double' if suppor
 #define DOT_PRODUCT( VECTOR1, VECTOR2 )    VECTOR1.transpose() * VECTOR2
 #define NORM( VECTOR )                     VECTOR.norm()
 #include <Eigen/Dense>
-using namespace Eigen;
 
-typedef Matrix<ScalarType, Dynamic, Dynamic, RowMajor> MatrixXXrow;
-typedef Matrix<ScalarType, Dynamic, Dynamic, ColMajor> MatrixXX;
-typedef Matrix<ScalarType, Dynamic, 1> VectorX;
+typedef Eigen::Matrix<ScalarType, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXXrow;
+typedef Eigen::Matrix<ScalarType, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> MatrixXX;
+typedef Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> VectorX;
 // typedef Array<int, Dynamic, 1> ArrayX1i;
 
 typedef MatrixXXrow GenericRowMatrix;

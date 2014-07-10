@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
 
 #if defined( USE_EIGEN )
   std::cout << "Creating eigen matrix " << Xrows << " X " << Xcols << std::endl;
-  Map<MatrixXXrow> X(data,Xrows,Xcols);       // Needs to be row-major to mirror NetCDF output
+  Eigen::Map<MatrixXXrow> X(data,Xrows,Xcols);       // Needs to be row-major to mirror NetCDF output
   std::cout << "Created eigen matrix " << Xrows << " X " << Xcols << std::endl;
 #endif
 

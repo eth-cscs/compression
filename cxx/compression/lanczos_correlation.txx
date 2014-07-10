@@ -116,8 +116,8 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
 #if defined( USE_EIGEN )
 
 #if defined( EIGEN_EIGENSOLVE )
-      SelfAdjointEigenSolver<GenericColMatrix> eigensolver(Trid.block(0,0,j+1,j+1));
-      if (eigensolver.info() != Success) abort();
+      Eigen::SelfAdjointEigenSolver<GenericColMatrix> eigensolver(Trid.block(0,0,j+1,j+1));
+      if (eigensolver.info() != Eigen::Success) abort();
       GenericVector  eigs = eigensolver.eigenvalues().block(j+1-ne,0,ne,1);  // ne largest Ritz values, sorted ascending
       GenericColMatrix UT = eigensolver.eigenvectors();   // Ritz vectors
       // std::cout << "iteration : " << j << ", Tblock : " << Trid.block(0,0,j+1,j+1) << std::endl;

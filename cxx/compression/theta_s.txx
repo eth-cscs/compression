@@ -37,7 +37,7 @@ void theta_s(const std::vector<int> &gamma_ind, const GenericRowMatrix &X, Gener
     if ( sum_gamma > 0 ) {
       //  std::cout << "Norm of first X column " << X.col(Nonzeros[0]).norm() << std::endl;
 #if defined( USE_EIGEN )
-      local_theta.col(k) =  MatrixXd::Zero(Ntl, 1);
+      local_theta.col(k) =  Eigen::MatrixXd::Zero(Ntl, 1);
       for (int m = 0; m < Nonzeros.size() ; m++ ) {
         local_theta.col(k) += X.col(Nonzeros[m]);  
       }
