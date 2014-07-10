@@ -83,7 +83,6 @@ int main(int argc, char *argv[])
 //    aprun -n 2 ./netcdf_test /project/csstaff/outputs/echam/echam6/echam_output/t31_196001.01_echam.nc seaice
 //
 {
-  using namespace std;
 
   typedef double               ScalarType;     //feel free to change this to 'double' if supported by your hardware
 

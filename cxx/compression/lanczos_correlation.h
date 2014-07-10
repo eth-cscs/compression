@@ -1,5 +1,3 @@
-using namespace std;
-
 #include "generic_wrappers.h"
 #if defined( USE_MINLIN )
 #include "minlin_wrappers.h"
