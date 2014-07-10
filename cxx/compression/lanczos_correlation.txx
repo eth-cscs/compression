@@ -11,6 +11,7 @@
 	   @return                    vector of concatenated field values
 	 */
 
+
 template <typename ScalarType>
 bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericColMatrix &EV, bool reorthogonalize=false)
 {
@@ -32,10 +33,8 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   GenericVector tmp_vector(N);   // temporary
 
 #if defined( USE_EIGEN )      
-  V.col(0).setOnes();     // Simple initial vector; no apparent side effects
-/*  
-  V.col(0).setRandom();   // Warning:  all nodes must generate same random vector in parallel (utilize the seed; but how is this done in Eigen?)
-*/
+  //V.col(0).setOnes();     // Simple initial vector; no apparent side effects
+  V.col(0).setRandom();     // Random initial vector, all nodes must generate same vector so use srand(RANDOM_SEED) in caller
   V.col(0) /= V.col(0).norm();    // Unit vector
   GenericColMatrix Trid = GenericColMatrix::Zero(max_iter,max_iter);  // Tridiagonal
   tmp_vector = Xtranslated*(Xtranslated.transpose()*V.col(0));  // order important! evaluate right to left to save calculation!

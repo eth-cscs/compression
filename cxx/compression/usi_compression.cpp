@@ -5,6 +5,7 @@
 
 #define MAX_ITER 100
 #define TOL 1.0e-7
+#define RANDOM_SEED 123456
 
 #include <random>
 #include <algorithm>
@@ -241,6 +242,9 @@ int main(int argc, char *argv[])
   ScalarType L_value_old = 1.0e19;   // Very big value
   ScalarType L_value_new;
   bool success;
+
+  // initialize random seed used in lanczos algorithm in loop
+  srand(RANDOM_SEED);
 
   for ( int iter = 0; iter < MAX_ITER; iter++ ) {
     theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
