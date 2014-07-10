@@ -10,11 +10,7 @@
 #include <random>
 #include <algorithm>
 #include <mpi.h>
-
-#include <boost/numeric/ublas/vector.hpp>
-#include <boost/numeric/ublas/io.hpp>
-#include <boost/numeric/ublas/assignment.hpp> 
-using namespace boost::numeric;
+#include <iostream> 
 
 #include "usi_compression.h"
 #include "read_timeseries_matrix.h"
@@ -127,6 +123,7 @@ int main(int argc, char *argv[])
   std::cout << "Decomposition:  pes_in_x " << pes_in_x << " pes_in_y " << pes_in_y << " iam x " << iam_in_x << " iam_in_y " << iam_in_y << std::endl;
 
   if ( pes_in_x * pes_in_y != mpi_processes ) { std::cout << "mpi_processes " << mpi_processes << " not power of two; aborting " << std::endl; abort(); }
+
 
 
   std::string              filename(argv[1]);
