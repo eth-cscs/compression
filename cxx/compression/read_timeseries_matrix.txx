@@ -29,11 +29,8 @@ ScalarType* read_timeseries_matrix(const std::string filename, const std::vector
   size_t *dims;
   size_t *p;
 
-  std::string input_filename, output_filename;
-
-  input_filename = filename + ".nc4";
-  
-  output_filename = filename + "_" + fields[0] + ".nc4";
+  std::string input_filename = filename;
+  std::string output_filename = filename.substr(0,filename.length()-4) + "_" + fields[0] + ".nc4";
 
   int my_rank, mpi_processes;
   int slab_size ; // is the number of entries in one slab to be read in
