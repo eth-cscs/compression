@@ -26,3 +26,6 @@
 # Compiled Project Files
 usi_compression_eigen
 usi_compression_minlin_host
+
+# Vim Swap Files
+*.swp
