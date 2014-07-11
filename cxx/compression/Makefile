@@ -20,3 +20,6 @@ minlin_host: usi_compression.cpp
 
 eigen: usi_compression.cpp
 	CC usi_compression.cpp -o usi_compression_eigen -fopenmp -O3 $(INCLUDE) $(EIGEN_INCLUDE) $(LIBS) $(EIGEN_ARGS)
+
+clean:
+	rm -f usi_compression_eigen usi_compression_minlin_host
