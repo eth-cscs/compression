@@ -137,28 +137,29 @@ int main(int argc, char *argv[])
 
 
 
+  //
+  // Set Up Data Used In Algorithm
+  //
 
-
-
+  // dimensions of data are saved as Ntl and nl for convenience & clarity
   const int Ntl = Xrows;  // number of values along direction that is
-                          // compressed (observations in PCA)
+                          // compressed (variables/parameters in PCA)
   const int nl =  Xcols;  // number of values along direction that is 
-                          // distributed on cores (parameters in PCA)
+                          // distributed on cores (observations in PCA)
 
-  // we need the global nl to know the length needed for gamma_ind
+  // we need the global nl to generate the initial cluster configuration
+  // in a consistent way for any PE configuration
   int *nl_global = new int[sizeof(int)*mpi_processes];
   int total_nl = 0;
   MPI_Allgather( &nl, 1, MPI_INT, nl_global, 1, MPI_INT, MPI_COMM_WORLD);
   for ( int rank=0; rank < mpi_processes; rank++ ) { total_nl += nl_global[rank]; } 
-  std::vector<int> gamma_ind = gamma_zero(nl_global, my_rank, KSIZE ); // Needs to be generated in a consistent way for any PE configuration
+  std::vector<int> gamma_ind = gamma_zero(nl_global, my_rank, KSIZE);
   // print out nl sizes of all processes (for debugging)
   // std::cout << "nl sizes "; for ( int rank=0; rank < mpi_processes; rank++ ) { std::cout << nl_global[rank] << " "; } 
   // std::cout << std::endl;
   delete[] nl_global;
 
-
-
-
+  // we allocate the matrices used for the algorithm outside of the loop
   GenericColMatrix theta(Ntl,KSIZE);                   // Time series means (one for each k), allocate outside loop
   std::vector<GenericColMatrix> TT(KSIZE,GenericColMatrix(Ntl,1) );        // Eigenvectors: 1-each for each k
   std::vector<GenericColMatrix> EOFs(KSIZE,GenericColMatrix(Ntl,MSIZE) );  // Eigenvectors: MSIZE eigenvectors for each k
@@ -174,13 +175,23 @@ int main(int argc, char *argv[])
   srand(RANDOM_SEED);
 #endif
 
+
+  //
+  // Iterate To Find Optimal Clustering
+  //
+
   for ( int iter = 0; iter < MAX_ITER; iter++ ) {
-    theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
-    L_value_new =  L_value( gamma_ind, TT, X, theta ); 
+
+    // determine X column means for each active state denoted by gamma_ind
+    theta_s<ScalarType>(gamma_ind, X, theta);
+    
+    // we calculate the L value here for output only (TODO: remove this for optimization later)
+    L_value_new =  L_value( gamma_ind, TT, X, theta );
     if (!my_rank) std::cout << "L value after Theta calc " << L_value_new << std::endl;
     // Not clear if there should be monotonic decrease here:  new theta_s needs new TT, right?
-    // if ( iter > 0 ) { std::cout << "L value after theta determination " << L_value( gamma_ind, TT, X, theta ) << std::endl; }
-    for(int k = 0; k < KSIZE; k++) {              // Principle Component Analysis
+    
+    // Principle Component Analysis for every cluster
+    for(int k = 0; k < KSIZE; k++) {
       std::vector<int> Nonzeros = find( gamma_ind, k );
       GenericColMatrix Xtranslated( Ntl, Nonzeros.size() ) ;
       // if (!my_rank) std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
@@ -188,13 +199,17 @@ int main(int argc, char *argv[])
       {
         GET_COLUMN(Xtranslated,m) = GET_COLUMN(X,Nonzeros[m]) - GET_COLUMN(theta,k) ; 
       }
-      //      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-13, 50, TT[k], true);
       bool success = lanczos_correlation(Xtranslated, 1, 1.0e-11, 50, TT[k], true);
     }
-    L_value_new =  L_value( gamma_ind, TT, X, theta ); 
+
+    // we calculate the L value here for output only (TODO: remove this for optimization later)
+    L_value_new =  L_value( gamma_ind, TT, X, theta );
     if (!my_rank) std::cout << "L value after PCA " << L_value_new << std::endl;
     
+    // find new optimal clustering
     gamma_s( X, theta, TT, gamma_ind );
+
+    // calculate new L value and decide whether to continue
     L_value_new =  L_value( gamma_ind, TT, X, theta ); 
     if (!my_rank) std::cout << "L value after gamma minimization " << L_value_new << std::endl;
     if ( L_value_new > L_value_old ) { 
@@ -213,32 +228,37 @@ int main(int argc, char *argv[])
 
 
   //
-  // Do Compression With Best Clustering
+  // Do Compression With Optimal Clustering
   //
 
-  theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
-  for(int k = 0; k < KSIZE; k++) {              // Principle Component Analysis
+  // Determine X column means for each active state denoted by gamma_ind
+  theta_s<ScalarType>(gamma_ind, X, theta);
+  
+  // Principal Component Analysis for every cluster
+  for(int k = 0; k < KSIZE; k++) {
     std::vector<int> Nonzeros = find( gamma_ind, k );
     GenericColMatrix Xtranslated( Ntl, Nonzeros.size() ) ;
     for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
     {
       GET_COLUMN(Xtranslated,m) = GET_COLUMN(X,Nonzeros[m]) - GET_COLUMN(theta,k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
     }
-    // lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), MSIZE, 1.0e-8, Ntl, EOFs[k], true);
     lanczos_correlation(Xtranslated, MSIZE, 1.0e-8, Ntl, EOFs[k], true);
   }
   L_value_new =  L_value( gamma_ind, EOFs, X, theta );
   if (!my_rank) std::cout << "L value final " << L_value_new << std::endl;
 
   // Calculated the reduced representation of X
-
   reduction<ScalarType>( gamma_ind, EOFs, X, theta, Xreduced );
 
+  // we save the time to check the runtime for each part of the algorithm
   double time_after_compression = MPI_Wtime();
 
-  // Calculate the reconstructed X
 
-  reconstruction<ScalarType>( gamma_ind, EOFs, theta, Xreduced, Xreconstructed );
+  //
+  // Reconstruct Data for Comparison with Original
+  //
+
+  reconstruction<ScalarType>(gamma_ind, EOFs, theta, Xreduced, Xreconstructed);
   ScalarType value  = 0.0;
   ScalarType output;
   for (int l = 0; l < nl; l++ ) { 
@@ -250,9 +270,13 @@ int main(int argc, char *argv[])
 #else
     ERROR:  must USE_EIGEN or USE_MINLIN
 #endif
-  }  
+  }
   MPI_Allreduce( &value, &output, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
 
+
+  //
+  // Statistics Output
+  //
 
   double time_for_solve = time_after_compression -  time_after_reading_data;
   double time_for_input = time_after_reading_data - time_at_start;
@@ -269,19 +293,23 @@ int main(int argc, char *argv[])
   if (!my_rank) std::cout << "Compression ratio  " << size_uncompressed / size_compressed << std::endl;
   if (!my_rank) std::cout << "Root mean square error " << sqrt( output ) << std::endl;
 
+
+  //
+  // Write Reconstructed Data to File
+  //
+
   int retval;
-  // OUTPUT
+  // TODO: this line doesn't return, fix this
   if ((retval = nc_put_vara_double(ncid_out, varid_out, start, count, Xreconstructed.data() ))) ERR(retval);
-  // OUTPUT FILE will be closed in main program
   if ((retval = nc_close(ncid_out))) ERR(retval);
 
 
+  //
+  //  Terminate MPI and Quit Program.
+  //
+
   retval =  0;
   if (!my_rank) std::cout << "retval " << retval << std::endl;
-
-  //
-  //  Terminate MPI.
-  //
 
   MPI_Finalize();
 
