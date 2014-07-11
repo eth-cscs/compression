@@ -300,7 +300,7 @@ int main(int argc, char *argv[])
 
   int retval;
   // TODO: this line doesn't return, fix this
-  if ((retval = nc_put_vara_double(ncid_out, varid_out, start, count, Xreconstructed.data() ))) ERR(retval);
+  if ((retval = nc_put_vara_double(ncid_out, varid_out, start, count, GET_POINTER(Xreconstructed) ))) ERR(retval);
   if ((retval = nc_close(ncid_out))) ERR(retval);
 
 
