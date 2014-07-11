@@ -82,57 +82,47 @@ int main(int argc, char *argv[])
 //
 {
 
-  /* This will be the netCDF ID for the file and data variable. */
-  int ncid_out, varid_out, dimid;
-  int nvars_in, ngatts_in, unlimdimid_in;
-  int my_rank, mpi_processes;
-
-  /* Loop indexes, and error handling. */
-  int x, y, retval ;
-  int slab_size ; // is the number of entries in one slab to be read in
-
-  size_t *p;
-  size_t *start, *count;
-
-//
-//  Initialize MPI.
-//
-  double t1, t2, t3, dt_input, dt_solve, size_uncompr, size_compr;
-
-  MPI_Init ( &argc, &argv );
-  t1 = MPI_Wtime();   // Start of program
-  MPI_Comm comm = MPI_COMM_WORLD;
-  MPI_Info info = MPI_INFO_NULL;
-
-  MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );   
-  MPI_Comm_size( MPI_COMM_WORLD, &mpi_processes );
+  //
+  // Input Argument Handling
+  //
 
   if (argc <= 2) {
     std::cout << "Usage: " << argv[0] << " <Filename>" << " <field name>" << std::endl;
     exit(1);
   }
-
-  int pes_in_x;
-  int pes_in_y = 1;
-
-  for ( pes_in_x = mpi_processes; pes_in_x > pes_in_y; pes_in_x /= 2 ) { pes_in_y *= 2; }
-
-  const int iam_in_x = my_rank % pes_in_x;
-  const int iam_in_y = my_rank / pes_in_x;
-
-  std::cout << "Decomposition:  pes_in_x " << pes_in_x << " pes_in_y " << pes_in_y << " iam x " << iam_in_x << " iam_in_y " << iam_in_y << std::endl;
-
-  if ( pes_in_x * pes_in_y != mpi_processes ) { std::cout << "mpi_processes " << mpi_processes << " not power of two; aborting " << std::endl; abort(); }
+  std::string filename = argv[1];
+  std::vector<std::string> fields(argv+2, argv+argc); // only the first field is currently used
 
 
+  //
+  //  Initialize MPI
+  //
 
-  std::string              filename(argv[1]);
-  std::vector<std::string> fields(argv+2, argv+argc);
-  int  Xrows, Xcols;
+  MPI_Init ( &argc, &argv );
+  double time_at_start = MPI_Wtime();   // used for calculating running time of each part of the algorithm
 
-  ScalarType*  data = read_timeseries_matrix<ScalarType>( filename, fields, iam_in_x, iam_in_y, pes_in_x, pes_in_y, Xrows, Xcols, &start, &count, &ncid_out, &varid_out );
+  int my_rank, mpi_processes;
+  MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );   
+  MPI_Comm_size( MPI_COMM_WORLD, &mpi_processes );
 
-  // std::cout << "Creating Time Series Matrix " << Xrows << " X " << Xcols << std::endl;
+  int processes_in_x;
+  int processes_in_y = 1;
+  for ( processes_in_x = mpi_processes; processes_in_x > processes_in_y; processes_in_x /= 2 ) { processes_in_y *= 2; }
+
+  const int iam_in_x = my_rank % processes_in_x;
+  const int iam_in_y = my_rank / processes_in_x;
+  std::cout << "Decomposition:  processes_in_x " << processes_in_x << " processes_in_y " << processes_in_y << " iam x " << iam_in_x << " iam_in_y " << iam_in_y << std::endl;
+  if ( processes_in_x * processes_in_y != mpi_processes ) { std::cout << "mpi_processes " << mpi_processes << " not power of two; aborting " << std::endl; abort(); }
+  
+
+  //
+  // Read NetCDF Data
+  //
+
+  int  Xrows, Xcols, ncid_out, varid_out;
+  size_t *start, *count;
+  ScalarType*  data = read_timeseries_matrix<ScalarType>( filename, fields, iam_in_x, iam_in_y, processes_in_x, processes_in_y, Xrows, Xcols, &start, &count, &ncid_out, &varid_out );
+
 #if defined( USE_EIGEN )
   Eigen::Map<MatrixXXrow> X(data,Xrows,Xcols);       // Needs to be row-major to mirror NetCDF output
 #elif defined( USE_MINLIN )
@@ -142,26 +132,27 @@ int main(int argc, char *argv[])
        X(i,j) = *data;
 #endif
 
-  t2 = MPI_Wtime();   // After data have been read in
+  double time_after_reading_data = MPI_Wtime();
 
-  //
-  // want vector of length X.rows() of random values between {0,k-1}
-  //
 
-  // create a blank vector of length X.rows()
 
-  const int Ntl = Xrows;
-  const int nl =  Xcols;
 
-  int *nl_global;
+
+
+
+  const int Ntl = Xrows;  // number of values along direction that is
+                          // compressed (observations in PCA)
+  const int nl =  Xcols;  // number of values along direction that is 
+                          // distributed on cores (parameters in PCA)
+
+  // collect nl from all MPI processes
+  int *nl_global; // TODO: delete this when no longer used
   int total_nl = 0;
-
   nl_global = (int*) malloc (sizeof(int)*mpi_processes);
   MPI_Allgather( &nl, 1, MPI_INT, nl_global, 1, MPI_INT, MPI_COMM_WORLD);
   for ( int rank=0; rank < mpi_processes; rank++ ) { total_nl += nl_global[rank]; } 
 
-  size_uncompr = (double) (Ntl * total_nl);
-
+  // print out nl sizes of all processes (for debugging)
   // std::cout << "nl sizes "; for ( int rank=0; rank < mpi_processes; rank++ ) { std::cout << nl_global[rank] << " "; } 
   // std::cout << std::endl;
 
@@ -176,7 +167,6 @@ int main(int argc, char *argv[])
 
   ScalarType L_value_old = 1.0e19;   // Very big value
   ScalarType L_value_new;
-  bool success;
 
 #if defined( USE_EIGEN )
   // initialize random seed used in lanczos algorithm
@@ -198,7 +188,7 @@ int main(int argc, char *argv[])
         GET_COLUMN(Xtranslated,m) = GET_COLUMN(X,Nonzeros[m]) - GET_COLUMN(theta,k) ; 
       }
       //      lanczos_correlation(Xtranslated.block(0,0,Ntl,Nonzeros.size()), 1, 1.0e-13, 50, TT[k], true);
-      success = lanczos_correlation(Xtranslated, 1, 1.0e-11, 50, TT[k], true);
+      bool success = lanczos_correlation(Xtranslated, 1, 1.0e-11, 50, TT[k], true);
     }
     L_value_new =  L_value( gamma_ind, TT, X, theta ); 
     if (!my_rank) std::cout << "L value after PCA " << L_value_new << std::endl;
@@ -220,6 +210,11 @@ int main(int argc, char *argv[])
     L_value_old = L_value_new;
   }
 
+
+  //
+  // Do Compression With Best Clustering
+  //
+
   theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
   for(int k = 0; k < KSIZE; k++) {              // Principle Component Analysis
     std::vector<int> Nonzeros = find( gamma_ind, k );
@@ -238,7 +233,7 @@ int main(int argc, char *argv[])
 
   reduction<ScalarType>( gamma_ind, EOFs, X, theta, Xreduced );
 
-  t3 = MPI_Wtime();   // After data have been read in
+  double time_after_compression = MPI_Wtime();
 
   // Calculate the reconstructed X
 
@@ -258,34 +253,36 @@ int main(int argc, char *argv[])
   MPI_Allreduce( &value, &output, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
 
 
-  t3 -= t2;    // delta time solve
-  t2 -= t1;    // delta time input
+  double time_for_solve = time_after_compression -  time_after_reading_data;
+  double time_for_input = time_after_reading_data - time_at_start;
   
-  size_compr = (double) (KSIZE * ( MSIZE + 1) *( Ntl + total_nl ) );
+  double max_time_for_solve, max_time_for_input;
+  MPI_Allreduce( &time_for_solve, &max_time_for_solve, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
+  MPI_Allreduce( &time_for_input, &max_time_for_input, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
 
-  MPI_Allreduce( &t3, &dt_solve, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
-  MPI_Allreduce( &t2, &dt_input, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
+  double size_uncompressed = (double) (Ntl * total_nl);
+  double size_compressed = (double) (KSIZE * ( MSIZE + 1) *( Ntl + total_nl ) );
 
-  if (!my_rank) std::cout << "Max time for input " << dt_input << std::endl;
-  if (!my_rank) std::cout << "Max time for solve " << dt_solve << std::endl;
-  if (!my_rank) std::cout << "Compression ratio  " << size_uncompr / size_compr << std::endl;
+  if (!my_rank) std::cout << "Max time for input " << max_time_for_input << std::endl;
+  if (!my_rank) std::cout << "Max time for solve " << max_time_for_solve << std::endl;
+  if (!my_rank) std::cout << "Compression ratio  " << size_uncompressed / size_compressed << std::endl;
   if (!my_rank) std::cout << "Root mean square error " << sqrt( output ) << std::endl;
 
-  
-// OUTPUT
+  int retval;
+  // OUTPUT
   if ((retval = nc_put_vara_double(ncid_out, varid_out, start, count, Xreconstructed.data() ))) ERR(retval);
-// OUTPUT FILE will be closed in main program
+  // OUTPUT FILE will be closed in main program
   if ((retval = nc_close(ncid_out))) ERR(retval);
 
-
-//
-//  Terminate MPI.
-//
 
   retval =  0;
   if (!my_rank) std::cout << "retval " << retval << std::endl;
 
-  MPI_Finalize ( );
+  //
+  //  Terminate MPI.
+  //
+
+  MPI_Finalize();
 
   return 0;
 }
