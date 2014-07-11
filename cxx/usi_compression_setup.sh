@@ -4,6 +4,7 @@
 # load modules
 module swap PrgEnv-cray PrgEnv-gnu
 module load boost
+module load cudatoolkit
 module load cmake
 module load craype-accel-nvidia35
 module load cray-netcdf-hdf5parallel

@@ -1,7 +1,7 @@
-MINLINROOT=/users/wsawyer/Software/USI_COMPRESSION/minlin/include
+MINLINROOT=../../../minlin/include
 EIGENROOT=../eigen 
 MKLROOT=/opt/intel/14.0.1.106/composer_xe_2013_sp1.1.106/mkl
-THRUSTROOT=/scratch/daint/bcumming/github/thrust
+THRUSTROOT=$(CUDATOOLKIT_HOME)/include/thrust
 
 MINLIN_INCLUDE=-I$(MINLINROOT)
 EIGEN_INCLUDE=-I$(EIGENROOT)
