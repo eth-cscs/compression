@@ -145,18 +145,19 @@ int main(int argc, char *argv[])
   const int nl =  Xcols;  // number of values along direction that is 
                           // distributed on cores (parameters in PCA)
 
-  // collect nl from all MPI processes
-  int *nl_global; // TODO: delete this when no longer used
+  // we need the global nl to know the length needed for gamma_ind
+  int *nl_global = new int[sizeof(int)*mpi_processes];
   int total_nl = 0;
-  nl_global = (int*) malloc (sizeof(int)*mpi_processes);
   MPI_Allgather( &nl, 1, MPI_INT, nl_global, 1, MPI_INT, MPI_COMM_WORLD);
   for ( int rank=0; rank < mpi_processes; rank++ ) { total_nl += nl_global[rank]; } 
-
+  std::vector<int> gamma_ind = gamma_zero(nl_global, my_rank, KSIZE ); // Needs to be generated in a consistent way for any PE configuration
   // print out nl sizes of all processes (for debugging)
   // std::cout << "nl sizes "; for ( int rank=0; rank < mpi_processes; rank++ ) { std::cout << nl_global[rank] << " "; } 
   // std::cout << std::endl;
+  delete[] nl_global;
 
-  std::vector<int> gamma_ind = gamma_zero(nl_global, my_rank, KSIZE ); // Needs to be generated in a consistent way for any PE configuration
+
+
 
   GenericColMatrix theta(Ntl,KSIZE);                   // Time series means (one for each k), allocate outside loop
   std::vector<GenericColMatrix> TT(KSIZE,GenericColMatrix(Ntl,1) );        // Eigenvectors: 1-each for each k
