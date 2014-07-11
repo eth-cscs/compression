@@ -178,8 +178,10 @@ int main(int argc, char *argv[])
   ScalarType L_value_new;
   bool success;
 
-  // initialize random seed used in lanczos algorithm in loop
+#if defined( USE_EIGEN )
+  // initialize random seed used in lanczos algorithm
   srand(RANDOM_SEED);
+#endif
 
   for ( int iter = 0; iter < MAX_ITER; iter++ ) {
     theta_s<ScalarType>(gamma_ind, X, theta);       // Determine X column means for each active state denoted by gamma_ind
