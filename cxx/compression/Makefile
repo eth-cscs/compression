@@ -1,7 +1,6 @@
 MINLINROOT=/users/wsawyer/Software/USI_COMPRESSION/minlin/include
-EIGENROOT=/users/wsawyer/Software/USI_COMPRESSION/usi_compression/cxx/eigen 
+EIGENROOT=../eigen 
 MKLROOT=/opt/intel/14.0.1.106/composer_xe_2013_sp1.1.106/mkl
-BOOSTROOT=/apps/daint/boost/1.54.0/gnu_473/include
 THRUSTROOT=/scratch/daint/bcumming/github/thrust
 
 MINLIN_INCLUDE=-I$(MINLINROOT)
