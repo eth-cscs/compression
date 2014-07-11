@@ -1,5 +1,4 @@
-#ifndef _USI_COMPRESSION_H
-#define _USI_COMPRESSION_H
+#pragma once
 
 #include <mkl.h>
 
@@ -108,6 +107,4 @@ MINLIN_INIT
 
 #else
 ERROR!   MUST USE A LIBRARY, E.G. USE_EIGEN OR USE_MINLIN
-#endif
-
 #endif
