@@ -82,8 +82,10 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
     // find matrix-vector product for next iteration
   {
     GenericVector tmp_ne(Xtranslated.cols());
+    // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
     gemv_wrapper( tmp_ne.pointer(), V.pointer()+j*N, Xtranslated, 1., 0., 'T' );
-    gemv_wrapper( r.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
+    //gemv_wrapper( r.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
+    r = Xtranslated * tmp_ne;
   }    
     MPI_Allreduce( GET_POINTER(r), GET_POINTER(w), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
 
@@ -132,7 +134,8 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
         {
           GenericVector tmp_ne(Xtranslated.cols());
           gemv_wrapper( tmp_ne.pointer(), EV.pointer()+count*N, Xtranslated, 1., 0., 'T' );
-          gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
+          //gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
+          tmp_vector = Xtranslated * tmp_ne;
         }    
 
         // find the residual
