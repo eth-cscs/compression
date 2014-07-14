@@ -97,9 +97,16 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
         HostMatrix<ScalarType> Tsub = Trid(0,j,0,j);
         HostMatrix<ScalarType> UVhost(j+1,ne);
 #ifdef FULL_EIGENSOLVE
-        assert( geev(Tsub.pointer(), UVhost.pointer(), er.pointer(), ei.pointer(), ne) );
+        //TODO: this is not working
+        // The geev routine calculates all j+1 vectors & eigenvalues
+        // whereas the UV matrix only has ne columns.
+        // If this should be made to work, geev needs to return only the
+        // ne eigenvectors with the largest eigenvalues
+        assert( geev(Tsub.pointer(), UVhost.pointer(), er.pointer(), ei.pointer(), j+1) );
+        //std::cout << "er: " << er(0,j) << std::endl;
 #else
         assert( steigs( Tsub.pointer(), UVhost.pointer(), er.pointer(), j+1, ne) );
+        //std::cout << "er: " << er(0,j) << std::endl;
 #endif
         //TODO: make sure eigenvalues have ascending/descending order
         // copy eigenvectors for reduced system to the device
