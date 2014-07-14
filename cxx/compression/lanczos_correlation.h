@@ -9,5 +9,5 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
 #if defined( USE_EIGEN )
 #include "lanczos_correlation_eigen.txx"
 #else
-#include "lanczos_correlation.txx"
+#include "lanczos_correlation_minlin.txx"
 #endif
