@@ -113,7 +113,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
         GenericColMatrix UV = UVhost;
 
         // find approximate eigenvectors of full system
-        EV = V(all,0,j+1)*UV;
+        EV = V(all,0,j)*UV;
       }
 
       // copy eigenvectors for reduced system to the device
