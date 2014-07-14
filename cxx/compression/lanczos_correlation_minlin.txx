@@ -17,7 +17,6 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
 {
   int N = Xtranslated.rows();
   ScalarType gamma, delta;
-  bool converged = false;
 
   // check that output matrix has correct dimensions
   assert(EV.rows() == N);
@@ -34,25 +33,29 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
 
   GenericVector er(max_iter);        // ScalarType components of eigenvalues
   GenericVector ei(max_iter);        // imaginary components of eigenvalues
-  V(all,0) = ScalarType(1.);
+  V(all,0) = ScalarType(1.); //TODO: make this a random vector
   V(all,0) /= norm(V(all,0));    // Unit vector
   GenericColMatrix Trid(max_iter,max_iter);  // Tridiagonal
   Trid(all) = 0.;                            // Matrix must be zeroed out
   {
     GenericVector tmp_ne(Xtranslated.cols());
+    // calculate Xtranslated.T*V0 (TODO: find better way to do this)
     gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated, 1., 0., 'T' );
+    //for(int i=0; i<tmp_ne.size(); i++) {
+    //  tmp_ne(i) = dot(Xtranslated(all,i),V(all,0));
+    //}
+    // calculate Xtranslated*(Xtranslated.T*V0)
     gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
+    //tmp_vector = Xtranslated * tmp_ne;
+    //std::cout << "doing initial A*x0 calculation" << std::endl;
   }
   MPI_Allreduce( tmp_vector.pointer(), w.pointer(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
   delta = dot(w, V(all,0));
 
   Trid(0,0) = delta;  // store in tridiagonal matrix
 
-  ScalarType convergence_error;
-  int iter;
-
-    // main loop, will terminate earlier if tolerance is reached
-
+  // main loop, will terminate earlier if tolerance is reached
+  bool converged = false;
   for(int j=1; j<max_iter && !converged; ++j) {
     if ( j == 1 )
       w -= delta * GET_COLUMN(V,j-1) ;
@@ -89,16 +92,16 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
     Trid(j, j) = delta;
     if ( j >= ne ) {
       // find eigenvectors/eigenvalues for the reduced triangular system
-      GenericVector  eigs(ne);
+      GenericVector eigs(j+1); //TODO: this is not used, use either eigs or er
       {
         HostMatrix<ScalarType> Tsub = Trid(0,j,0,j);
         HostMatrix<ScalarType> UVhost(j+1,ne);
 #ifdef FULL_EIGENSOLVE
         assert( geev(Tsub.pointer(), UVhost.pointer(), er.pointer(), ei.pointer(), ne) );
 #else
-        std::cout << "j+1 " << j+1 << " ne " << ne << std::endl;
         assert( steigs( Tsub.pointer(), UVhost.pointer(), er.pointer(), j+1, ne) );
 #endif
+        //TODO: make sure eigenvalues have ascending/descending order
         // copy eigenvectors for reduced system to the device
         GenericColMatrix UV = UVhost;
 
@@ -145,8 +148,8 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
       }
     } // end-if estimate eigenvalues
   } // end-for main
-  // return failure if no convergence
 
+  // return failure if no convergence
   return (!converged);
 
 }
