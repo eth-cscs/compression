@@ -43,14 +43,11 @@ bool steigs
     num_eigs = num_eigs<0 ? n : num_eigs;
     num_eigs = num_eigs>n ? n : num_eigs;
 
-    // allocate memory for storing superdiagonal
-    real *e = new real[sizeof(real)*(n-1)];
-    // allocate memory for eigenvectors returned by LAPACK
-    real *z = new real[sizeof(real)*(n*n)];
-    // point d to eigs (?steqr stores eigenvalues in vector used to pass in diagonal)
-    real *d = eigs;
-    // allocate memory for working array needed by LAPACK
-    real *work = new real[sizeof(real)*2*n];
+    // allocate memory for arrays used by LAPACK
+    real *e = new real[sizeof(real)*(n-1)];   // superdiagonal
+    real *z = new real[sizeof(real)*(n*n)];   // eigenvectors returned by LAPACK
+    real *d = new real[sizeof(real)*n];       // diagonal, used by ?steqr for storing eigenvalues
+    real *work = new real[sizeof(real)*2*n];  // working array for LAPACK
 
     // pack the diagonal and super diagonal of T
     int pos=0;
@@ -66,19 +63,20 @@ bool steigs
     if(result)
         return false;
 
-    // reverse the order of the eigenvalue storage
-    std::reverse(eigs, eigs+n);
+    // copy the eigenvalues/-vectors to the output arrays
+    // and reverse the order as ?steqr returns them in 
+    // ascending order
     for(int i=0; i<num_eigs; i++) {
         real* ptr_to   = V + i*n;
         real* ptr_from = z + (n-i-1)*n;
         std::copy(ptr_from,  ptr_from+n,  ptr_to);
+        std::copy(d + (n-i-1), d + (n-i), eigs + i);
     }
 
-    // free working array
-    //free(e);
-    //free(z);
+    // free working arrays
     delete[] e;
     delete[] z;
+    delete[] d;
     delete[] work;
 
     return true;

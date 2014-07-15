@@ -100,7 +100,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
     if ( j >= ne ) {
 
       // find eigenvectors/eigenvalues for the reduced triangular system
-      GenericVector eigs(j+1);
+      GenericVector eigs(ne);
       
       HostMatrix<ScalarType> Tsub = Trid(0,j,0,j);
       HostMatrix<ScalarType> UVhost(j+1,ne);
@@ -108,7 +108,6 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
       // we calculate the eigenvalues with a MKL routine as minlin doesn't
       // have an eigensolver
       assert( steigs( Tsub.pointer(), UVhost.pointer(), eigs.pointer(), j+1, ne) );
-      //TODO: make sure eigenvalues have ascending/descending order
       
       // copy eigenvectors for reduced system to the device
       GenericColMatrix UV = UVhost;
