@@ -44,9 +44,9 @@ bool steigs
     num_eigs = num_eigs>n ? n : num_eigs;
 
     // allocate memory for storing superdiagonal
-    real *e = (real*)malloc(sizeof(real)*(n-1));
+    real *e = new real[sizeof(real)*(n-1)];
     // allocate memory for eigenvectors returned by LAPACK
-    real *z = (real*)malloc(sizeof(real)*(n*n));
+    real *z = new real[sizeof(real)*(n*n)];
     // point d to eigs (?steqr stores eigenvalues in vector used to pass in diagonal)
     real *d = eigs;
     // allocate memory for working array needed by LAPACK
@@ -75,8 +75,10 @@ bool steigs
     }
 
     // free working array
-    free(e);
-    free(z);
+    //free(e);
+    //free(z);
+    delete[] e;
+    delete[] z;
     delete[] work;
 
     return true;
