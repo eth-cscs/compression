@@ -212,12 +212,12 @@ int main(int argc, char *argv[])
     // calculate new L value and decide whether to continue
     L_value_new =  L_value( gamma_ind, TT, X, theta ); 
     if (!my_rank) std::cout << "L value after gamma minimization " << L_value_new << std::endl;
-    if ( L_value_new > L_value_old ) { 
-      if (!my_rank) std::cout << "New L_value " << L_value_new << " larger than old: " << L_value_old << " aborting " << std::endl;
+    if ( (L_value_old - L_value_new) < L_value_new*TOL ) {
+      if (!my_rank) std::cout << " Converged: to tolerance " << TOL << " after " << iter << " iterations " << std::endl;
       break;
     }
-    else if ( (L_value_old - L_value_new) < L_value_new*TOL ) {
-      if (!my_rank) std::cout << " Converged: to tolerance " << TOL << " after " << iter << " iterations " << std::endl;
+    else if ( L_value_new > L_value_old ) { 
+      if (!my_rank) std::cout << "New L_value " << L_value_new << " larger than old: " << L_value_old << " aborting " << std::endl;
       break;
     }
     else if ( iter+1 == MAX_ITER ) {
