@@ -31,24 +31,17 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   GenericVector r(N);   // residual, temporary
   GenericVector tmp_vector(N);   // temporary
 
-  GenericVector er(max_iter);        // ScalarType components of eigenvalues
-  GenericVector ei(max_iter);        // imaginary components of eigenvalues
   V(all,0) = ScalarType(1.); //TODO: make this a random vector
   V(all,0) /= norm(V(all,0));    // Unit vector
   GenericColMatrix Trid(max_iter,max_iter);  // Tridiagonal
   Trid(all) = 0.;                            // Matrix must be zeroed out
-  {
-    GenericVector tmp_ne(Xtranslated.cols());
-    // calculate Xtranslated.T*V0 (TODO: find better way to do this)
-    gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated, 1., 0., 'T' );
-    //for(int i=0; i<tmp_ne.size(); i++) {
-    //  tmp_ne(i) = dot(Xtranslated(all,i),V(all,0));
-    //}
-    // calculate Xtranslated*(Xtranslated.T*V0)
-    gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
-    //tmp_vector = Xtranslated * tmp_ne;
-    //std::cout << "doing initial A*x0 calculation" << std::endl;
-  }
+  
+  GenericVector tmp_ne(Xtranslated.cols());
+  // calculate Xtranslated.T*V0 (TODO: find better way to do this)
+  gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated, 1., 0., 'T' );
+  gemv_wrapper( tmp_vector.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
+  //tmp_vector = Xtranslated * tmp_ne;
+  
   MPI_Allreduce( tmp_vector.pointer(), w.pointer(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
   delta = dot(w, V(all,0));
 
@@ -80,13 +73,11 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
     Trid(j  ,j-1) = gamma;
 
     // find matrix-vector product for next iteration
-  {
     GenericVector tmp_ne(Xtranslated.cols());
     // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
     gemv_wrapper( tmp_ne.pointer(), V.pointer()+j*N, Xtranslated, 1., 0., 'T' );
-    //gemv_wrapper( r.pointer(), tmp_ne.pointer(), Xtranslated, 1., 0., 'N' );
     r = Xtranslated * tmp_ne;
-  }    
+
     MPI_Allreduce( GET_POINTER(r), GET_POINTER(w), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
 
     // update diagonal of tridiagonal system
@@ -95,28 +86,18 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
     if ( j >= ne ) {
       // find eigenvectors/eigenvalues for the reduced triangular system
       GenericVector eigs(j+1); //TODO: this is not used, use either eigs or er
-      {
-        HostMatrix<ScalarType> Tsub = Trid(0,j,0,j);
-        HostMatrix<ScalarType> UVhost(j+1,ne);
-#ifdef FULL_EIGENSOLVE
-        //TODO: this is not working
-        // The geev routine calculates all j+1 vectors & eigenvalues
-        // whereas the UV matrix only has ne columns.
-        // If this should be made to work, geev needs to return only the
-        // ne eigenvectors with the largest eigenvalues
-        assert( geev(Tsub.pointer(), UVhost.pointer(), er.pointer(), ei.pointer(), j+1) );
-        //std::cout << "er: " << er(0,j) << std::endl;
-#else
-        assert( steigs( Tsub.pointer(), UVhost.pointer(), er.pointer(), j+1, ne) );
-        //std::cout << "er: " << er(0,j) << std::endl;
-#endif
-        //TODO: make sure eigenvalues have ascending/descending order
-        // copy eigenvectors for reduced system to the device
-        GenericColMatrix UV = UVhost;
+      
+      HostMatrix<ScalarType> Tsub = Trid(0,j,0,j);
+      HostMatrix<ScalarType> UVhost(j+1,ne);
+      
+      assert( steigs( Tsub.pointer(), UVhost.pointer(), eigs.pointer(), j+1, ne) );
+      //TODO: make sure eigenvalues have ascending/descending order
+      
+      // copy eigenvectors for reduced system to the device
+      GenericColMatrix UV = UVhost;
 
-        // find approximate eigenvectors of full system
-        EV = V(all,0,j)*UV;
-      }
+      // find approximate eigenvectors of full system
+      EV = V(all,0,j)*UV;
 
       // copy eigenvectors for reduced system to the device
       ////////////////////////////////////////////////////////////////////
@@ -129,7 +110,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
       ScalarType max_err = 0.;
 
       for(int count=0; count<ne && !converged; count++){
-        ScalarType this_eig = er(count);
+        ScalarType this_eig = eigs(count);
         // std::cout << "iteration : " << j << ", this_eig : " << this_eig << std::endl;
         {
           GenericVector tmp_ne(Xtranslated.cols());
