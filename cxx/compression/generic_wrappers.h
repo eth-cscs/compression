@@ -17,11 +17,17 @@
 //  output :    d   :   contains eigenvalues in ascending order
 //              e   :   overwritten with arbitrary data
 //              z   :   contains n orthonormal eigenvectors stored as columns
-lapack_int steqr(lapack_int n, float* d, float* e, float* z) {
-    return LAPACKE_ssteqr(LAPACK_COL_MAJOR, 'I', n, d, e, z, n);
+lapack_int steqr(lapack_int n, float* d, float* e, float* z, float* work) {
+    int info;
+    char compz = 'I';
+    ssteqr(&compz, &n, d, e, z, &n, work, &info);
+    return info;
 }
-lapack_int steqr(lapack_int n, double* d, double* e, double* z) {
-    return LAPACKE_dsteqr(LAPACK_COL_MAJOR, 'I', n, d, e, z, n);
+lapack_int steqr(lapack_int n, double* d, double* e, double* z, double* work) {
+    int info;
+    char compz = 'I';
+    dsteqr(&compz, &n, d, e, z, &n, work, &info);
+    return info;
 }
 
 template <typename real>
@@ -43,6 +49,8 @@ bool steigs
     real *z = (real*)malloc(sizeof(real)*(n*n));
     // point d to eigs (?steqr stores eigenvalues in vector used to pass in diagonal)
     real *d = eigs;
+    // allocate memory for working array needed by LAPACK
+    real *work = new real[sizeof(real)*2*n];
 
     // pack the diagonal and super diagonal of T
     int pos=0;
@@ -54,7 +62,7 @@ bool steigs
     d[n-1] = T[pos];
 
     // compute eigenvalues
-    lapack_int result = steqr(n, d, e, z);
+    lapack_int result = steqr(n, d, e, z, work);
     if(result)
         return false;
 
@@ -69,6 +77,7 @@ bool steigs
     // free working array
     free(e);
     free(z);
+    delete[] work;
 
     return true;
 }
