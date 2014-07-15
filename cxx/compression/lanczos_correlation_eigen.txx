@@ -36,7 +36,13 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   V.col(0).setRandom();     // Random initial vector, all nodes must generate same vector so use srand(RANDOM_SEED) in caller
   V.col(0) /= V.col(0).norm();    // Unit vector
   GenericColMatrix Trid = GenericColMatrix::Zero(max_iter,max_iter);  // Tridiagonal
-  tmp_vector = Xtranslated*(Xtranslated.transpose()*V.col(0));  // order important! evaluate right to left to save calculation!
+  if (Xtranslated.cols() > 0) {
+    tmp_vector = Xtranslated*(Xtranslated.transpose()*V.col(0));  // order important! evaluate right to left to save calculation!
+  } else {
+    // if there are no data columns assigned for the current cluster and process,
+    // do not attempt to participate in the calculation
+    tmp_vector.setZero();
+  }
   MPI_Allreduce( tmp_vector.data(), w.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
   delta = w.transpose() * V.col(0);
 
@@ -70,7 +76,13 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
     Trid(j  ,j-1) = gamma;
 
     // find matrix-vector product for next iteration
-    r = Xtranslated*(Xtranslated.transpose()*V.col(j));
+    if (Xtranslated.cols() > 0) {
+      r = Xtranslated*(Xtranslated.transpose()*V.col(j));
+    } else {
+      // if there are no data columns assigned for the current cluster and process,
+      // do not attempt to participate in the calculation
+      r.setZero();
+    }
     MPI_Allreduce( GET_POINTER(r), GET_POINTER(w), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
 
     // update diagonal of tridiagonal system
@@ -113,7 +125,13 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
       for(int count=ne-1; count>=0 && !converged; count--){
         ScalarType this_eig = eigs(count);
         // std::cout << "iteration : " << j << ", this_eig : " << this_eig << std::endl;
-        tmp_vector = Xtranslated*( Xtranslated.transpose() * EV.col(count) );  // TODO: MINLIN
+        if (Xtranslated.cols() > 0) {
+          tmp_vector = Xtranslated*( Xtranslated.transpose() * EV.col(count) );  // TODO: MINLIN
+        } else {
+          // if there are no data columns assigned for the current cluster and process,
+          // do not attempt to participate in the calculation
+          tmp_vector.setZero();
+        }
 
         // find the residual
         // r = Xtranslated*( Xtranslated.transpose() * EV.col(count) ) - this_eig*EV.col(count);
