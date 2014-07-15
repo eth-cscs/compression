@@ -42,9 +42,15 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
                                             // minlin cannot do A*(A.T*v) efficiently
 
   // calculate the first entry of the tridiagonal matrix
-  // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
-  gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated, 1., 0., 'T' );
-  tmp_vector = Xtranslated * tmp_ne;
+  if (Xtranslated.cols() > 0) {
+    // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
+    gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated, 1., 0., 'T' );
+    tmp_vector = Xtranslated * tmp_ne;
+  } else {
+    // if there are no data columns assigned for the current cluster and process,
+    // do not attempt to participate in the calculation
+    tmp_vector(all) = 0;
+  }
   MPI_Allreduce( tmp_vector.pointer(), w.pointer(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
   delta = dot(w, V(all,0));
   Trid(0,0) = delta;  // store in tridiagonal matrix
@@ -74,8 +80,14 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
 
     // find matrix-vector product for next iteration
     // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
-    gemv_wrapper( tmp_ne.pointer(), V.pointer()+j*N, Xtranslated, 1., 0., 'T' );
-    r = Xtranslated * tmp_ne;
+    if (Xtranslated.cols() > 0) {
+      gemv_wrapper( tmp_ne.pointer(), V.pointer()+j*N, Xtranslated, 1., 0., 'T' );
+      r = Xtranslated * tmp_ne;
+    } else {
+      // if there are no data columns assigned for the current cluster and process,
+      // do not attempt to participate in the calculation
+      r(all) = 0;
+    }
     MPI_Allreduce( GET_POINTER(r), GET_POINTER(w), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
 
     // update diagonal of tridiagonal system
@@ -116,9 +128,15 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
       for(int count=0; count<ne && !converged; count++){
         ScalarType this_eig = eigs(count);
         
-        // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
-        gemv_wrapper( tmp_ne.pointer(), EV.pointer()+count*N, Xtranslated, 1., 0., 'T' );
-        tmp_vector = Xtranslated * tmp_ne;
+        if (Xtranslated.cols() > 0) {
+          // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
+          gemv_wrapper( tmp_ne.pointer(), EV.pointer()+count*N, Xtranslated, 1., 0., 'T' );
+          tmp_vector = Xtranslated * tmp_ne;
+        } else {
+          // if there are no data columns assigned for the current cluster and process,
+          // do not attempt to participate in the calculation
+          tmp_vector(all) = 0;
+        }
 
         // find the residual
         // r = Xtranslated*( Xtranslated.transpose() * EV.col(count) ) - this_eig*EV.col(count);
