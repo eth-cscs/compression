@@ -22,6 +22,36 @@
      /* Handle errors by printing an error message and exiting with a
       * non-zero status. */
 
+/*
+get total number of dimensions from netcdf
+make sure this is the same as the sum of compressed & distributed dimensions
+
+decide on number of subdivisions in each compressed direction
+
+create vectors/arrays start, count, imap of length ndims
+create vector/array stride = ones of length ndims
+
+set inter-element-distance = 1
+
+go through compressed dimensions
+get id and length for dimension
+write start[id] = 0
+write count[id] = length
+write imap[id] = inter-element-distance
+set inter-element-distance *= length
+
+go through distributed dimensions
+get id and length for dimension
+calculate start and count for dimension, depending on rank
+write these to start[id] and count[id]
+write imap[id] = inter-element-distance
+set inter-element-distance *= count
+
+read array from file with nc_get_varm_double(ncid, varid, start, count, stride, imap, data)
+create column major matrix from data
+*/
+
+
 template <typename ScalarType>
 ScalarType* read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields, const int iam_in_x, const int iam_in_y, const int pes_in_x, const int pes_in_y, int &rows, int &cols, size_t **start_out, size_t **count_out, int *ncid_out, int *varid_out )
 {
