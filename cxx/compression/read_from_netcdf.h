@@ -53,80 +53,167 @@ create column major matrix from data
 
 
 template <typename ScalarType>
-ScalarType* read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields, const int iam_in_x, const int iam_in_y, const int pes_in_x, const int pes_in_y, int &rows, int &cols, size_t **start_out, size_t **count_out, int *ncid_out, int *varid_out )
+GenericMatrix read_from_netcdf(const std::string filename,
+                               const std::string variable,
+                               const std::vector<std::string> compressed_dimensions,
+                               const std::vector<std::string> distributed_dimensions)
 {
-  int ncid, varid;
-  int ndims;
 
-  /* error handling */
-  int retval ;
-
-  int    *dimids, *dimids_out;
-  size_t *dims;
-  size_t *p;
-
-  std::string input_filename = filename;
-  std::string output_filename = filename.substr(0,filename.length()-4) + "_" + fields[0] + ".nc4";
-
+  // get MPI information
   int my_rank, mpi_processes;
+  MPI_Comm mpi_comm = MPI_COMM_WORLD;
+  MPI_Info mpi_info = MPI_INFO_NULL;
+  MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );
+  MPI_Comm_size( MPI_COMM_WORLD, &mpi_processes );
+
+
+  // open NetCDF file for read-only access
+  int retval, netcdf_id; // retval is used for error handling within the whole function
+  if ((retval = nc_open_par(filename.c_str(), NC_NOWRITE|NC_MPIIO, mpi_comm, mpi_info, &netcdf_id))) ERR(retval);
+  if (!my_rank) std::cout << "Processing: " << filename.c_str() << " SEARCHING FOR " << variable.c_str() << std::endl;
+
+  // get number of dimensions for selected variable
+  int variable_id, n_dimensions;
+  if ((retval = nc_inq_varid(netcdf_id, variable.c_str(), &variable_id))) ERR(retval);
+  if ((retval = nc_inq_varndims(netcdf_id, variable_id, &n_dimensions))) ERR(retval);
+  if (!my_rank) std::cout << "ndims " << ndims << std::endl;
+  assert(n_dimensions == compressed_dimensions.size() + distributed_dimensions.size());
+
+  // build list of dimension ids for compressed & distributed dimensions
+  // this is not very nice but we need to go through the dimensions to find
+  // their place in the list of dimensions used for the variable
+  int* dimension_ids = new int[sizeof(int)*n_dimensions];
+  if ((retval = nc_inq_vardimid(netcdf_id, variable_id, dimension_ids))) ERR(retval);
+  std::vector<int> compressed_dimensions_ids(compressed_dimensions.size());
+  for (i=0, i<compressed_dimensions.size(), i++) {
+    if ((retval = nc_inq_dimid(netcdf_id, compressed_dimensions[i].c_str(), dimension_id))) ERR(retval);
+    for j=0, j<n_dimensions, j++ {
+      if (dimension_ids[j] == dimension_id) {
+        compressed_dimensions_ids[i] = j;
+        break;
+      }
+    }
+  }
+  std::vector<int> distributed_dimensions_ids(distributed_dimensions.size());
+  for (i=0, i<distributed_dimensions.size(), i++) {
+    if ((retval = nc_inq_dimid(netcdf_id, distributed_dimensions[i].c_str(), dimension_id))) ERR(retval);
+    for j=0, j<n_dimensions, j++ {
+      if (dimension_ids[j] == dimension_id) {
+        distributed_dimensions_ids[i] = j;
+        break;
+      }
+    }
+  }
+  // TODO: add check whether variable has been found
+
+
+  // set up arrays used as arguments for reading the data
+  size_t* start = new size_t[sizeof(size_t)*n_dimensions];
+  size_t* count = new size_t[sizeof(size_t)*n_dimensions];
+  ptrdiff_t* imap = new ptrdiff_t[sizeof(ptrdiff_t)*n_dimensions];
+
+
+  // the inter-element distance is needed for building up the 'imap' vector
+  int interelement_distance = 1;
+
+
+  int dimension_id, vardim_id;
+
+  // fill up entries in start, count, and imap belonging to compressed dimensions
+  if (!my_rank) std::cout << "Compressed dimensions:" << std::endl;
+  for (i=0, i<compressed_dimensions.size(), i++) {
+
+    // find out where in the variable dimensions the current dimension is located
+    // TODO: check if there is a better way for this
+    if ((retval = nc_inq_dimid(netcdf_id, compressed_dimensions[i].c_str(), &dimension_id))) ERR(retval);
+    vardim_id = -1;
+    for j=0, j<n_dimensions, j++ {
+      if (dimension_ids[j] == dimension_id) {
+        vardim_id = j;
+        break;
+      }
+    }
+    assert(vardim_id >= 0); // make sure the dimension has been found
+
+    // get length of dimension
+    size_t dim_length;
+    if ((retval = nc_inq_dimlen(netcdf_id, dimension_id, &dim_length))) ERR(retval);
+    if (!my_rank) std::cout << "  dimension '" << compressed_dimensions[i] << "': length " << dim_length << std::endl;
+
+    // write values into arrays
+    start[vardim_id] = 0;
+    count[vardim_id] = dim_length;
+    imap[vardim_id] = interelement_distance;
+
+    // the next variable has to change slower in the output array
+    interelement_distance *= dim_length;  
+  }
+
+  int N_rows = interelement_distance;
+
+  // fill up entries in start, count, and imap belonging to distributed dimensions
+  if (!my_rank) std::cout << "Distributed dimensions:" << std::endl;
+  for (i=0, i<distributed_dimensions.size(), i++) {
+
+    // find out where in the variable dimensions the current dimension is located
+    // TODO: check if there is a better way for this
+    if ((retval = nc_inq_dimid(netcdf_id, distributed_dimensions[i].c_str(), &dimension_id))) ERR(retval);
+    vardim_id = -1;
+    for j=0, j<n_dimensions, j++ {
+      if (dimension_ids[j] == dimension_id) {
+        vardim_id = j;
+        break;
+      }
+    }
+    assert(vardim_id >= 0); // make sure the dimension has been found
+
+    // get length of dimension
+    size_t dim_length;
+    if ((retval = nc_inq_dimlen(netcdf_id, dimension_id, &dim_length))) ERR(retval);
+    if (!my_rank) std::cout << "  dimension '" << distributed_dimensions[i] << "': length " << dim_length << std::endl;
+
+    // write values into arrays
+    start[vardim_id] = 0;           // TODO: calculate correct value based on splitting
+    count[vardim_id] = dim_length;  // TODO: calculate correct value based on splitting
+    imap[vardim_id] = interelement_distance;
+
+    // the next variable has to change slower in the output array
+    interelement_distance *= dim_length; // TODO: change to correct value based on splitting
+  }
+
+  int N_cols = interelement_distance / N_rows;
+
+
+  // read values for output
+  GenericColMatrix output(N_rows, N_columns);
+  ScalarType *data = GET_POINTER(output);
+  if ((retval = nc_get_varam_double(netcdf_id, variable_id, start, count, NULL, imap, data))) ERR(retval);
+
+  // delete working arrays
+  delete[] start;
+  delete[] count;
+  delete[] imap;
+
+  return output;
+
+
+
+
+
+
   int slab_size ; // is the number of entries in one slab to be read in
   ScalarType *data;
   char dim_name[NC_MAX_NAME+1];
 
-  MPI_Comm comm = MPI_COMM_WORLD;
-  MPI_Info info = MPI_INFO_NULL;
 
-  MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );   
-  MPI_Comm_size( MPI_COMM_WORLD, &mpi_processes );
-  // Assumptions: mpi_processes is power of 2
-
-  /* Open the file. NC_NOWRITE tells netCDF we want read-only access to the file.*/
-
-  if ( my_rank == 0 ) std::cout << "Processing: " << input_filename.c_str() << " SEARCHING FOR " << fields[0].c_str() << std::endl;
-
-  if ((retval = nc_open_par(input_filename.c_str(), NC_NOWRITE|NC_MPIIO, comm, info, &ncid))) ERR(retval);
-
-  if ((retval = nc_create_par(output_filename.c_str(), NC_CLOBBER | NC_NETCDF4 | NC_MPIIO, comm, info, ncid_out))) ERR(retval);
-
-  //  sequential: if ((retval = nc_open(input_filename.c_str(), NC_NOWRITE, &ncid))) ERR(retval);
-
-  if ((retval = nc_inq_varid(ncid, fields[0].c_str(), &varid))) ERR(retval);
-
-  if ((retval = nc_inq_varndims(ncid, varid, &ndims))) ERR(retval);
-  
-  if ( my_rank == 0 ) std::cout << "ndims " << ndims << std::endl;
-
-  dimids = (int*)    malloc (sizeof(int)*ndims);
-  dimids_out = (int*)    malloc (sizeof(int)*ndims);
-  *start_out  = (size_t*) malloc (sizeof(size_t)*ndims);   // Starting points for parallel implementation
-  *count_out  = (size_t*) malloc (sizeof(size_t)*ndims);   // Slab sizes
   dims   = (size_t*) malloc (sizeof(size_t)*ndims);
 
   size_t *start = *start_out;
   size_t *count = *count_out;
 
-  if ((retval = nc_inq_vardimid(ncid, varid, dimids))) ERR(retval);
-
-  p = dims;
-  for (int i=0; i<ndims; ++i ) {
-    if ((retval = nc_inq_dim(ncid, dimids[i], dim_name, p))) ERR(retval);
-    if ( my_rank == 0 ) std::cout << "dimension = " << dim_name << " length " << *p << std::endl;
-// OUTPUT
-    if ((retval = nc_def_dim(*ncid_out, dim_name, *p, &dimids_out[i]))) ERR(retval);   // Define dimensions
-    *p++;
-    start[i] = 0;
-  }
 
 
-// OUTPUT
-  if ((retval = nc_def_var(*ncid_out, fields[0].c_str(), NC_DOUBLE, ndims, dimids_out, varid_out))) ERR(retval);   // Define variable
-  if ((retval = nc_enddef(*ncid_out))) ERR(retval);   // End of definition
 
-  for (int i=0; i < ndims-2; ++i) {   // First dimensions are not distributed 
-    start[i] = 0;
-    count[i] = dims[i];
-  }
-  // Last two dimensions are distributed, assumes that dimensions are divisible by decomposition
 
   
   if (dims[ndims-2] % pes_in_x != 0) {
@@ -151,12 +238,7 @@ ScalarType* read_timeseries_matrix(const std::string filename, const std::vector
   /* Read the slab this process is responsible for. */
   std::cout << "Rank: " << my_rank << " reading count " << count[0] << " " << count[1] << " " << count[2] << " " << count[3] << " start " << start[0] << " " << start[1] << " " << start[2] << " " << start[3] << std::endl;
   /* Read one slab of data. */
-  if ((retval = nc_get_vara_double(ncid, varid, start, count, data))) ERR(retval);
 
-// OUTPUT
-//  if ((retval = nc_put_vara_double(*ncid_out, *varid_out, start, count, data))) ERR(retval);
-// OUTPUT FILE will be closed in main program
-//  if ((retval = nc_close(*ncid_out))) ERR(retval);
 
   switch (ndims) 
   { 
