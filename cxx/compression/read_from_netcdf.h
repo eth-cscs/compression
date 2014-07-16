@@ -1,3 +1,11 @@
+#include <vector>
+#include "mpi.h"
+#include <netcdf_par.h>
+#include <netcdf.h>
+
+#define ERRCODE 2
+#define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(ERRCODE);}
+
 /**
 	   Write description of function here.
 	   The function should follow these comments.
@@ -13,8 +21,6 @@
 
      /* Handle errors by printing an error message and exiting with a
       * non-zero status. */
-#define ERRCODE 2
-#define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(ERRCODE);}
 
 template <typename ScalarType>
 ScalarType* read_timeseries_matrix(const std::string filename, const std::vector<std::string> fields, const int iam_in_x, const int iam_in_y, const int pes_in_x, const int pes_in_y, int &rows, int &cols, size_t **start_out, size_t **count_out, int *ncid_out, int *varid_out )
