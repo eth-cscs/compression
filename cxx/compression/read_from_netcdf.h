@@ -66,7 +66,6 @@ GenericMatrix read_from_netcdf(const std::string filename,
   MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );
   MPI_Comm_size( MPI_COMM_WORLD, &mpi_processes );
 
-
   // open NetCDF file for read-only access
   int retval, netcdf_id; // retval is used for error handling within the whole function
   if ((retval = nc_open_par(filename.c_str(), NC_NOWRITE|NC_MPIIO, mpi_comm, mpi_info, &netcdf_id))) ERR(retval);
@@ -79,33 +78,9 @@ GenericMatrix read_from_netcdf(const std::string filename,
   if (!my_rank) std::cout << "ndims " << ndims << std::endl;
   assert(n_dimensions == compressed_dimensions.size() + distributed_dimensions.size());
 
-  // build list of dimension ids for compressed & distributed dimensions
-  // this is not very nice but we need to go through the dimensions to find
-  // their place in the list of dimensions used for the variable
+  // get IDs of dimensions used for the variable
   int* dimension_ids = new int[sizeof(int)*n_dimensions];
   if ((retval = nc_inq_vardimid(netcdf_id, variable_id, dimension_ids))) ERR(retval);
-  std::vector<int> compressed_dimensions_ids(compressed_dimensions.size());
-  for (i=0, i<compressed_dimensions.size(), i++) {
-    if ((retval = nc_inq_dimid(netcdf_id, compressed_dimensions[i].c_str(), dimension_id))) ERR(retval);
-    for j=0, j<n_dimensions, j++ {
-      if (dimension_ids[j] == dimension_id) {
-        compressed_dimensions_ids[i] = j;
-        break;
-      }
-    }
-  }
-  std::vector<int> distributed_dimensions_ids(distributed_dimensions.size());
-  for (i=0, i<distributed_dimensions.size(), i++) {
-    if ((retval = nc_inq_dimid(netcdf_id, distributed_dimensions[i].c_str(), dimension_id))) ERR(retval);
-    for j=0, j<n_dimensions, j++ {
-      if (dimension_ids[j] == dimension_id) {
-        distributed_dimensions_ids[i] = j;
-        break;
-      }
-    }
-  }
-  // TODO: add check whether variable has been found
-
 
   // set up arrays used as arguments for reading the data
   size_t* start = new size_t[sizeof(size_t)*n_dimensions];
@@ -115,8 +90,6 @@ GenericMatrix read_from_netcdf(const std::string filename,
 
   // the inter-element distance is needed for building up the 'imap' vector
   int interelement_distance = 1;
-
-
   int dimension_id, vardim_id;
 
   // fill up entries in start, count, and imap belonging to compressed dimensions
@@ -183,36 +156,37 @@ GenericMatrix read_from_netcdf(const std::string filename,
 
   int N_cols = interelement_distance / N_rows;
 
-
   // read values for output
-  GenericColMatrix output(N_rows, N_columns);
-  ScalarType *data = GET_POINTER(output);
+  GenericColMatrix output_matrix(N_rows, N_columns);
+  ScalarType *data = GET_POINTER(output_matrix);
   if ((retval = nc_get_varam_double(netcdf_id, variable_id, start, count, NULL, imap, data))) ERR(retval);
 
   // delete working arrays
+  delete[] dimension_ids;
   delete[] start;
   delete[] count;
   delete[] imap;
 
-  return output;
+  if ((retval = nc_close(netcdf_id))) ERR(retval);
+
+  return output_matrix;
+
+}
 
 
 
 
 
 
-  int slab_size ; // is the number of entries in one slab to be read in
-  ScalarType *data;
-  char dim_name[NC_MAX_NAME+1];
+  int processes_in_x;
+  int processes_in_y = 1;
+  for ( processes_in_x = mpi_processes; processes_in_x > processes_in_y; processes_in_x /= 2 ) { processes_in_y *= 2; }
 
-
-  dims   = (size_t*) malloc (sizeof(size_t)*ndims);
-
-  size_t *start = *start_out;
-  size_t *count = *count_out;
-
-
-
+  const int iam_in_x = my_rank % processes_in_x;
+  const int iam_in_y = my_rank / processes_in_x;
+  std::cout << "Decomposition:  processes_in_x " << processes_in_x << " processes_in_y " << processes_in_y << " iam x " << iam_in_x << " iam_in_y " << iam_in_y << std::endl;
+  if ( processes_in_x * processes_in_y != mpi_processes ) { std::cout << "mpi_processes " << mpi_processes << " not power of two; aborting " << std::endl; abort(); }
+  
 
 
   
@@ -230,32 +204,6 @@ GenericMatrix read_from_netcdf(const std::string filename,
   start[ndims-1] = iam_in_y * ( dims[ndims-1] / pes_in_y ) ;
   count[ndims-1] = dims[ndims-1] / pes_in_y; 
 
-  slab_size = 1;
-  for (int i=0; i < ndims; ++i) { slab_size *= count[i]; }
-
-  data  = (ScalarType*) malloc (sizeof(ScalarType)*slab_size);
 
   /* Read the slab this process is responsible for. */
   std::cout << "Rank: " << my_rank << " reading count " << count[0] << " " << count[1] << " " << count[2] << " " << count[3] << " start " << start[0] << " " << start[1] << " " << start[2] << " " << start[3] << std::endl;
-  /* Read one slab of data. */
-
-
-  switch (ndims) 
-  { 
-    case 2:  cols = count[0]; cols = count[1]; break;
-    case 3:  rows = count[0]; cols = count[1]*count[2]; break;
-    case 4:  rows = count[0]*count[1]; cols = count[2]*count[3]; break;
-    default: std::cout << "Number dimensions " << ndims << " not supported " << std::endl; break;
-  }
-
-  free( dims );
-  free( dimids );
-//  free( start );
-//  free( count );
-
-  /* Close the file, freeing all resources. */
-  if ((retval = nc_close(ncid)))
-    ERR(retval);
-
-  return data;
-}
