@@ -71,6 +71,21 @@ GenericMatrix read_from_netcdf(const std::string filename,
   if ((retval = nc_open_par(filename.c_str(), NC_NOWRITE|NC_MPIIO, mpi_comm, mpi_info, &netcdf_id))) ERR(retval);
   if (!my_rank) std::cout << "Processing: " << filename.c_str() << " SEARCHING FOR " << variable.c_str() << std::endl;
 
+  // build list of number of processes along each distributed dimension
+  // note: we assume mpi_processes to be a power of 2
+  int p = mpi_processes;
+  int i = 0;
+  std::vector<int> process_distribution(distributed_dimensions.size(), 1);
+  while (p > 1) {
+    if (p%2 != 0) {
+      std::cout << "Error: The number of processes must be a power of 2" << std::endl;
+      exit(1);
+    }
+    p /= 2;
+    process_distribution[i] *= 2;
+    i = (i+1)%process_distribution.size(); // restart at the beginning if end is reached
+  }
+
   // get number of dimensions for selected variable
   int variable_id, n_dimensions;
   if ((retval = nc_inq_varid(netcdf_id, variable.c_str(), &variable_id))) ERR(retval);
@@ -86,7 +101,6 @@ GenericMatrix read_from_netcdf(const std::string filename,
   size_t* start = new size_t[sizeof(size_t)*n_dimensions];
   size_t* count = new size_t[sizeof(size_t)*n_dimensions];
   ptrdiff_t* imap = new ptrdiff_t[sizeof(ptrdiff_t)*n_dimensions];
-
 
   // the inter-element distance is needed for building up the 'imap' vector
   int interelement_distance = 1;
