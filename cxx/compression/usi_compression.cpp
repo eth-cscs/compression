@@ -13,7 +13,7 @@
 #include <iostream> 
 
 #include "usi_compression.h"
-#include "read_timeseries_matrix.h"
+#include "read_from_netcdf.h"
 #include "gamma_zero.h"
 #include "find.h"
 #include "theta_s.h"
@@ -105,36 +105,18 @@ int main(int argc, char *argv[])
   MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );   
   MPI_Comm_size( MPI_COMM_WORLD, &mpi_processes );
 
-  int processes_in_x;
-  int processes_in_y = 1;
-  for ( processes_in_x = mpi_processes; processes_in_x > processes_in_y; processes_in_x /= 2 ) { processes_in_y *= 2; }
-
-  const int iam_in_x = my_rank % processes_in_x;
-  const int iam_in_y = my_rank / processes_in_x;
-  std::cout << "Decomposition:  processes_in_x " << processes_in_x << " processes_in_y " << processes_in_y << " iam x " << iam_in_x << " iam_in_y " << iam_in_y << std::endl;
-  if ( processes_in_x * processes_in_y != mpi_processes ) { std::cout << "mpi_processes " << mpi_processes << " not power of two; aborting " << std::endl; abort(); }
-  
-
   //
   // Read NetCDF Data
   //
 
-  int  Xrows, Xcols, ncid_out, varid_out;
-  size_t *start, *count;
-  ScalarType*  data = read_timeseries_matrix<ScalarType>( filename, fields, iam_in_x, iam_in_y, processes_in_x, processes_in_y, Xrows, Xcols, &start, &count, &ncid_out, &varid_out );
-
-#if defined( USE_EIGEN )
-  Eigen::Map<MatrixXXrow> X(data,Xrows,Xcols);       // Needs to be row-major to mirror NetCDF output
-#elif defined( USE_MINLIN )
-  HostMatrix<ScalarType> X(Xrows,Xcols);
-  for(int i=0; i<Xrows; i++)
-    for(int j=0; j<Xcols; j++, data++)
-       X(i,j) = *data;
-#endif
-
+  //std::vector<std::string> compressed_dims = {"mlev", "time"};
+  //std::vector<std::string> distributed_dims = {"lon", "lat"};
+  std::vector<std::string> compressed_dims = {"lon", "lat"};
+  std::vector<std::string> distributed_dims = {"mlev", "time"};
+  GenericColMatrix X = read_from_netcdf<ScalarType>(filename, fields[0], compressed_dims, distributed_dims);
+  //std::cout << "Matrix X (rank " << my_rank << "):" << X << std::endl;
+  
   double time_after_reading_data = MPI_Wtime();
-
-
 
 
   //
@@ -142,10 +124,10 @@ int main(int argc, char *argv[])
   //
 
   // dimensions of data are saved as Ntl and nl for convenience & clarity
-  const int Ntl = Xrows;  // number of values along direction that is
-                          // compressed (variables/parameters in PCA)
-  const int nl =  Xcols;  // number of values along direction that is 
-                          // distributed on cores (observations in PCA)
+  const int Ntl = X.rows();  // number of values along direction that is
+                             // compressed (variables/parameters in PCA)
+  const int nl =  X.cols();  // number of values along direction that is 
+                             // distributed on cores (observations in PCA)
 
   // we need the global nl to generate the initial cluster configuration
   // in a consistent way for any PE configuration
@@ -300,8 +282,8 @@ int main(int argc, char *argv[])
 
   int retval;
   // TODO: this line doesn't return, fix this
-  if ((retval = nc_put_vara_double(ncid_out, varid_out, start, count, GET_POINTER(Xreconstructed) ))) ERR(retval);
-  if ((retval = nc_close(ncid_out))) ERR(retval);
+  //if ((retval = nc_put_vara_double(ncid_out, varid_out, start, count, GET_POINTER(Xreconstructed) ))) ERR(retval);
+  //if ((retval = nc_close(ncid_out))) ERR(retval);
 
 
   //
