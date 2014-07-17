@@ -106,15 +106,16 @@ GenericMatrix read_from_netcdf(const std::string filename,
   int interelement_distance = 1;
   int dimension_id, vardim_id;
 
-  // fill up entries in start, count, and imap belonging to compressed dimensions
+  // COMPRESSED DIMENSIONS
+  // fill up entries in start, count, and imap
   if (!my_rank) std::cout << "Compressed dimensions:" << std::endl;
-  for (i=0, i<compressed_dimensions.size(), i++) {
+  for (int i=0; i<compressed_dimensions.size(); i++) {
 
     // find out where in the variable dimensions the current dimension is located
     // TODO: check if there is a better way for this
     if ((retval = nc_inq_dimid(netcdf_id, compressed_dimensions[i].c_str(), &dimension_id))) ERR(retval);
     vardim_id = -1;
-    for j=0, j<n_dimensions, j++ {
+    for (int j=0; j<n_dimensions; j++) {
       if (dimension_ids[j] == dimension_id) {
         vardim_id = j;
         break;
@@ -138,15 +139,18 @@ GenericMatrix read_from_netcdf(const std::string filename,
 
   int N_rows = interelement_distance;
 
-  // fill up entries in start, count, and imap belonging to distributed dimensions
+  // DISTRIBUTED DIMENSIONS
+  // fill up entries in start, count, and imap
+  int r = my_rank; // needed for calculating index along dimension
+  int d = mpi_processes // needed for calculating index along dimension
   if (!my_rank) std::cout << "Distributed dimensions:" << std::endl;
-  for (i=0, i<distributed_dimensions.size(), i++) {
+  for (int i=0; i<distributed_dimensions.size(); i++) {
 
     // find out where in the variable dimensions the current dimension is located
     // TODO: check if there is a better way for this
     if ((retval = nc_inq_dimid(netcdf_id, distributed_dimensions[i].c_str(), &dimension_id))) ERR(retval);
     vardim_id = -1;
-    for j=0, j<n_dimensions, j++ {
+    for (int j=0; j<n_dimensions; j++) {
       if (dimension_ids[j] == dimension_id) {
         vardim_id = j;
         break;
@@ -157,11 +161,24 @@ GenericMatrix read_from_netcdf(const std::string filename,
     // get length of dimension
     size_t dim_length;
     if ((retval = nc_inq_dimlen(netcdf_id, dimension_id, &dim_length))) ERR(retval);
-    if (!my_rank) std::cout << "  dimension '" << distributed_dimensions[i] << "': length " << dim_length << std::endl;
+    if (!my_rank) std::cout << "  dimension '" << distributed_dimensions[i] << "': length " 
+        << dim_length << " divided into " << process_distribution[i] << " parts" << std::endl;
+
+    // calculate index along dimension
+    // note: this is not immediately obvious, change with care!
+    d /= process_distribution[i];
+    int dim_index = r / d;
+    r %= d;
+
+    int size_along_dim = dim_length / process_distribution[i];
 
     // write values into arrays
-    start[vardim_id] = 0;           // TODO: calculate correct value based on splitting
-    count[vardim_id] = dim_length;  // TODO: calculate correct value based on splitting
+    start[vardim_id] = dim_index * size_along_dim;
+    count[vardim_id] = size_along_dim;
+    if (dim_index == process_distribution[i] - 1) {
+      // if we are the last process along a dimension, add the remainder
+      count[vardim_id] += dim_length % process_distribution[i];
+    }
     imap[vardim_id] = interelement_distance;
 
     // the next variable has to change slower in the output array
@@ -175,6 +192,13 @@ GenericMatrix read_from_netcdf(const std::string filename,
   ScalarType *data = GET_POINTER(output_matrix);
   if ((retval = nc_get_varam_double(netcdf_id, variable_id, start, count, NULL, imap, data))) ERR(retval);
 
+  // print which values are read by the current rank
+  std::cout << "Rank " << my_rank << " has data";
+  for (int i=0; i<n_dimensions; i++) {
+    std::cout << " " << start[i] << "-" << start[i]+count[i];
+  }
+  std::cout << std::endl;
+
   // delete working arrays
   delete[] dimension_ids;
   delete[] start;
@@ -186,38 +210,3 @@ GenericMatrix read_from_netcdf(const std::string filename,
   return output_matrix;
 
 }
-
-
-
-
-
-
-  int processes_in_x;
-  int processes_in_y = 1;
-  for ( processes_in_x = mpi_processes; processes_in_x > processes_in_y; processes_in_x /= 2 ) { processes_in_y *= 2; }
-
-  const int iam_in_x = my_rank % processes_in_x;
-  const int iam_in_y = my_rank / processes_in_x;
-  std::cout << "Decomposition:  processes_in_x " << processes_in_x << " processes_in_y " << processes_in_y << " iam x " << iam_in_x << " iam_in_y " << iam_in_y << std::endl;
-  if ( processes_in_x * processes_in_y != mpi_processes ) { std::cout << "mpi_processes " << mpi_processes << " not power of two; aborting " << std::endl; abort(); }
-  
-
-
-  
-  if (dims[ndims-2] % pes_in_x != 0) {
-      if (!my_rank) std::cout << "dims[ndims-2] " << dims[ndims-2] << " is not divisible by pes_in_x = " << pes_in_x << std::endl;
-      return NULL;
-  } 
-  start[ndims-2] = iam_in_x * ( dims[ndims-2] / pes_in_x );
-  count[ndims-2] = dims[ndims-2] / pes_in_x; 
-
-  if (dims[ndims-1] % pes_in_y != 0) {
-      if (!my_rank) std::cout << "dims[ndims-1] " << dims[ndims-1] << " is not divisible by pes_in_y = " << pes_in_y << std::endl;
-      return NULL;
-  } 
-  start[ndims-1] = iam_in_y * ( dims[ndims-1] / pes_in_y ) ;
-  count[ndims-1] = dims[ndims-1] / pes_in_y; 
-
-
-  /* Read the slab this process is responsible for. */
-  std::cout << "Rank: " << my_rank << " reading count " << count[0] << " " << count[1] << " " << count[2] << " " << count[3] << " start " << start[0] << " " << start[1] << " " << start[2] << " " << start[3] << std::endl;
