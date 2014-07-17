@@ -105,16 +105,14 @@ int main(int argc, char *argv[])
   MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );   
   MPI_Comm_size( MPI_COMM_WORLD, &mpi_processes );
 
+
   //
   // Read NetCDF Data
   //
 
-  //std::vector<std::string> compressed_dims = {"mlev", "time"};
-  //std::vector<std::string> distributed_dims = {"lon", "lat"};
   std::vector<std::string> compressed_dims = {"lon", "lat"};
   std::vector<std::string> distributed_dims = {"mlev", "time"};
   GenericColMatrix X = read_from_netcdf<ScalarType>(filename, fields[0], compressed_dims, distributed_dims);
-  //std::cout << "Matrix X (rank " << my_rank << "):" << X << std::endl;
   
   double time_after_reading_data = MPI_Wtime();
 
