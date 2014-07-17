@@ -22,38 +22,8 @@
      /* Handle errors by printing an error message and exiting with a
       * non-zero status. */
 
-/*
-get total number of dimensions from netcdf
-make sure this is the same as the sum of compressed & distributed dimensions
-
-decide on number of subdivisions in each compressed direction
-
-create vectors/arrays start, count, imap of length ndims
-create vector/array stride = ones of length ndims
-
-set inter-element-distance = 1
-
-go through compressed dimensions
-get id and length for dimension
-write start[id] = 0
-write count[id] = length
-write imap[id] = inter-element-distance
-set inter-element-distance *= length
-
-go through distributed dimensions
-get id and length for dimension
-calculate start and count for dimension, depending on rank
-write these to start[id] and count[id]
-write imap[id] = inter-element-distance
-set inter-element-distance *= count
-
-read array from file with nc_get_varm_double(ncid, varid, start, count, stride, imap, data)
-create column major matrix from data
-*/
-
-
 template <typename ScalarType>
-GenericMatrix read_from_netcdf(const std::string filename,
+GenericColMatrix read_from_netcdf(const std::string filename,
                                const std::string variable,
                                const std::vector<std::string> compressed_dimensions,
                                const std::vector<std::string> distributed_dimensions)
@@ -69,6 +39,7 @@ GenericMatrix read_from_netcdf(const std::string filename,
   // open NetCDF file for read-only access
   int retval, netcdf_id; // retval is used for error handling within the whole function
   if ((retval = nc_open_par(filename.c_str(), NC_NOWRITE|NC_MPIIO, mpi_comm, mpi_info, &netcdf_id))) ERR(retval);
+  //if ((retval = nc_open(filename.c_str(), NC_NOWRITE|NC_MPIIO, &netcdf_id))) ERR(retval); // sequential version
   if (!my_rank) std::cout << "Processing: " << filename.c_str() << " SEARCHING FOR " << variable.c_str() << std::endl;
 
   // build list of number of processes along each distributed dimension
@@ -90,7 +61,7 @@ GenericMatrix read_from_netcdf(const std::string filename,
   int variable_id, n_dimensions;
   if ((retval = nc_inq_varid(netcdf_id, variable.c_str(), &variable_id))) ERR(retval);
   if ((retval = nc_inq_varndims(netcdf_id, variable_id, &n_dimensions))) ERR(retval);
-  if (!my_rank) std::cout << "ndims " << ndims << std::endl;
+  if (!my_rank) std::cout << "Number of dimensions: " << n_dimensions << std::endl;
   assert(n_dimensions == compressed_dimensions.size() + distributed_dimensions.size());
 
   // get IDs of dimensions used for the variable
@@ -142,7 +113,7 @@ GenericMatrix read_from_netcdf(const std::string filename,
   // DISTRIBUTED DIMENSIONS
   // fill up entries in start, count, and imap
   int r = my_rank; // needed for calculating index along dimension
-  int d = mpi_processes // needed for calculating index along dimension
+  int d = mpi_processes; // needed for calculating index along dimension
   if (!my_rank) std::cout << "Distributed dimensions:" << std::endl;
   for (int i=0; i<distributed_dimensions.size(); i++) {
 
@@ -182,22 +153,22 @@ GenericMatrix read_from_netcdf(const std::string filename,
     imap[vardim_id] = interelement_distance;
 
     // the next variable has to change slower in the output array
-    interelement_distance *= dim_length; // TODO: change to correct value based on splitting
+    interelement_distance *= count[vardim_id];
   }
 
   int N_cols = interelement_distance / N_rows;
 
-  // read values for output
-  GenericColMatrix output_matrix(N_rows, N_columns);
-  ScalarType *data = GET_POINTER(output_matrix);
-  if ((retval = nc_get_varam_double(netcdf_id, variable_id, start, count, NULL, imap, data))) ERR(retval);
-
   // print which values are read by the current rank
-  std::cout << "Rank " << my_rank << " has data";
-  for (int i=0; i<n_dimensions; i++) {
-    std::cout << " " << start[i] << "-" << start[i]+count[i];
-  }
-  std::cout << std::endl;
+  //std::cout << "Rank " << my_rank << " has data";
+  //for (int i=0; i<n_dimensions; i++) {
+  //  std::cout << " " << start[i] << "-" << start[i]+count[i]-1 << " (imap: " << imap[i] << ")  ";
+  //}
+  //std::cout << std::endl;
+
+  // read values for output
+  GenericColMatrix output_matrix(N_rows, N_cols);
+  ScalarType *data = GET_POINTER(output_matrix);
+  if ((retval = nc_get_varm_double(netcdf_id, variable_id, start, count, NULL, imap, data))) ERR(retval);
 
   // delete working arrays
   delete[] dimension_ids;
@@ -206,6 +177,7 @@ GenericMatrix read_from_netcdf(const std::string filename,
   delete[] imap;
 
   if ((retval = nc_close(netcdf_id))) ERR(retval);
+  if (!my_rank) std::cout << "Data successfully read from NetCDF file" << std::endl;
 
   return output_matrix;
 
