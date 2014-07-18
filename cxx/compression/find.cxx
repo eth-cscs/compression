@@ -20,19 +20,4 @@ std::vector<int> find(const std::vector<int> int_vector, const int k)
     if (int_vector[i] == k) { found_items.push_back(i); }
   }
   return found_items;
-/*
-  // John wants to clean up this version sometime.
-  std::for_each(gamma_ind.data(), gamma_ind.data()+gamma_ind.rows(),
-
-               [&match, &found_items, &gamma_ind](int *entry) mutable
-               {
-                 if( *entry == match)
-                 { 
-                   found_items.push_back(static_cast<int>(entry-gamma_ind.data())); 
-                 }
-               } );
-*/
-
-//  Map<Array<int, Dynamic, 1>> output( found_items.data(), found_items.size(), 1);
-//  return output;
 }
