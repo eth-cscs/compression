@@ -1,4 +1,4 @@
-MINLINROOT=../../../minlin/include
+MINLINROOT=../minlin/include
 EIGENROOT=../eigen 
 MKLROOT=/opt/intel/14.0.1.106/composer_xe_2013_sp1.1.106/mkl
 THRUSTROOT=$(CUDATOOLKIT_HOME)/include/thrust

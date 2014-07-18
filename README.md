@@ -10,6 +10,7 @@ Requirements
 The following setup is necessary to compile and run the algorithm. This list is
 not complete yet.
 
-* The minlin library has to be in the same directory as this repository.
+* The minlin library is included as a Git submodule, so it has to be initialized
+  and updated if the repository is cloned.
 * We use the Thrust from cudatoolkit, so the corresponding module has to be
   activated.
