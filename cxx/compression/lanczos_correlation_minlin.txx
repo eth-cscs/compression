@@ -43,8 +43,9 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
 
   // calculate the first entry of the tridiagonal matrix
   if (Xtranslated.cols() > 0) {
-    // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
-    gemv_wrapper( tmp_ne.pointer(), V.pointer(), Xtranslated, 1., 0., 'T' );
+    // we have to do this in two separate operations, otherwise we cannot
+    // force minlin to do the multiplications in the optimal order
+    tmp_ne = transpose(Xtranslated) * GET_COLUMN(V,0);
     tmp_vector = Xtranslated * tmp_ne;
   } else {
     // if there are no data columns assigned for the current cluster and process,
@@ -81,7 +82,9 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
     // find matrix-vector product for next iteration
     // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
     if (Xtranslated.cols() > 0) {
-      gemv_wrapper( tmp_ne.pointer(), V.pointer()+j*N, Xtranslated, 1., 0., 'T' );
+      // we have to do this in two separate operations, otherwise we cannot
+      // force minlin to do the multiplications in the optimal order
+      tmp_ne = transpose(Xtranslated) * GET_COLUMN(V,j);
       r = Xtranslated * tmp_ne;
     } else {
       // if there are no data columns assigned for the current cluster and process,
@@ -128,8 +131,9 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
         ScalarType this_eig = eigs(count);
         
         if (Xtranslated.cols() > 0) {
-          // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
-          gemv_wrapper( tmp_ne.pointer(), EV.pointer()+count*N, Xtranslated, 1., 0., 'T' );
+          // we have to do this in two separate operations, otherwise we cannot
+          // force minlin to do the multiplications in the optimal order
+          tmp_ne = transpose(Xtranslated) * GET_COLUMN(EV,count);
           tmp_vector = Xtranslated * tmp_ne;
         } else {
           // if there are no data columns assigned for the current cluster and process,
