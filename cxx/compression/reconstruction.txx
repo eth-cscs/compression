@@ -1,5 +1,8 @@
 /**
 	   Calculate the reduced field (in distributed form ) for each k
+           
+           Note: The matrix Xreduced is not changed in this function but we cannot pass 
+           it as const as minlin cannot do y = A*B(all,j) if B is const.
 	 
 	   @param[in]     gamma_ind       placement of state probabilities
 	   @param[in]     EOFs            Final EOFs (Array of GenericColMatrix)
@@ -9,7 +12,7 @@
 	 */
 
 template <typename ScalarType>
-void reconstruction( const std::vector<int> &gamma_ind, const std::vector<GenericColMatrix> &EOFs, const GenericColMatrix &theta, const std::vector<GenericColMatrix> &Xreduced, GenericRowMatrix &Xreconstructed )
+void reconstruction( const std::vector<int> &gamma_ind, const std::vector<GenericColMatrix> &EOFs, const GenericColMatrix &theta, std::vector<GenericColMatrix> &Xreduced, GenericRowMatrix &Xreconstructed )
 {
   const int Ntl = theta.rows();
   const int K   = theta.cols();
@@ -19,9 +22,10 @@ void reconstruction( const std::vector<int> &gamma_ind, const std::vector<Generi
     std::vector<int> Nonzeros = find( gamma_ind, k );
     for (int m = 0; m < Nonzeros.size() ; m++ ) {       // Translate X columns with mean value at new origin
 #if defined( USE_EIGEN )
-      Xreconstructed.col(Nonzeros[m])  = EOFs[k] * Xreduced[k].col(Nonzeros[m]) + theta.col(k);          // Translated back to theta_k 
+      Xreconstructed.col(Nonzeros[m]) = EOFs[k] * Xreduced[k].col(Nonzeros[m]) + theta.col(k);          // Translated back to theta_k 
 #elif defined( USE_MINLIN )
- // TODO:  FIX THIS
+      Xreconstructed(all,Nonzeros[m]) = EOFs[k] * Xreduced[k](all,Nonzeros[m]);
+      Xreconstructed(all,Nonzeros[m]) += theta(all,k);
  #else
       ERROR:  must USE_EIGEN or USE_MINLIN
 #endif

@@ -11,7 +11,6 @@
 #include <iostream> 
 
 #include <boost/program_options.hpp>
-namespace po = boost::program_options;
 
 #include "usi_compression.h"
 #include "read_from_netcdf.h"
@@ -105,6 +104,7 @@ int main(int argc, char *argv[])
   std::vector<std::string> compressed_dims;
   std::vector<std::string> distributed_dims;
 
+  namespace po = boost::program_options;
   po::options_description po_description("USI Compression: Options");
   po_description.add_options()
     ("help", "display this help message")
@@ -276,14 +276,18 @@ int main(int argc, char *argv[])
   //
 
   reconstruction<ScalarType>(gamma_ind, EOFs, theta, Xreduced, Xreconstructed);
+  ScalarType colnorm;
   ScalarType value  = 0.0;
   ScalarType output;
   for (int l = 0; l < nl; l++ ) { 
 #if defined( USE_EIGEN )
     Diff.col(l) = Xreconstructed.col(l)-X.col(l);
-    ScalarType colnorm = (Xreconstructed.col(l)-X.col(l)).norm(); value += colnorm*colnorm;
+    colnorm = (Xreconstructed.col(l)-X.col(l)).norm();
+    value += colnorm*colnorm;
 #elif defined( USE_MINLIN )
-    // TODO: MINLIN implementation
+    Diff(all,l) = Xreconstructed(all,l)-X(all,l);
+    colnorm = norm(Diff(all,l));
+    value += colnorm*colnorm;
 #else
     ERROR:  must USE_EIGEN or USE_MINLIN
 #endif

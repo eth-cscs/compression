@@ -80,7 +80,6 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
     Trid(j  ,j-1) = gamma;
 
     // find matrix-vector product for next iteration
-    // we have to keep this as a gemv-call because minlin doesn't support A.T*x yet
     if (Xtranslated.cols() > 0) {
       // we have to do this in two separate operations, otherwise we cannot
       // force minlin to do the multiplications in the optimal order

@@ -27,15 +27,11 @@ void reduction( const std::vector<int> &gamma_ind, const std::vector<GenericColM
 
     for (int m = 0; m < Nonzeros.size() ; m++ ) {       // Translate X columns with mean value at new origin
 #if defined( USE_EIGEN )      
-      Xtranslated.col(Nonzeros[m])  = X.col(Nonzeros[m]) - theta.col(k);                     // Translated to theta_k 
-      Xreduced[k].col(Nonzeros[m])  =  EOFs[k].transpose() * Xtranslated.col(Nonzeros[m]);
+      Xtranslated.col(Nonzeros[m]) = X.col(Nonzeros[m]) - theta.col(k);                     // Translated to theta_k 
+      Xreduced[k].col(Nonzeros[m]) =  EOFs[k].transpose() * Xtranslated.col(Nonzeros[m]);
 #elif defined( USE_MINLIN )
-      Xtranslated(all,Nonzeros[m])  = X(all,Nonzeros[m]) - theta(all,k);                     // Translated to theta_k 
-// Quick hack to use CUBLAS; this functionality should be integrated into MINLIN     Should be:
-//     Xtranslated(all,Nonzeros[m]) -=  EOFs[k] * ( transpose(EOFs[k]) * Xtranslated(all,Nonzeros[m]) ); 
-// TODO:  FIX THIS
-      GenericVector tmp( EOFs[k].cols() );
-      gemv_wrapper(tmp.pointer(), Xtranslated.pointer() + Ntl*Nonzeros[m], EOFs[k], 1., 0., 'T');
+      Xtranslated(all,Nonzeros[m]) = X(all,Nonzeros[m]) - theta(all,k);                     // Translated to theta_k 
+      Xreduced[k](all,Nonzeros[m]) = transpose(EOFs[k]) * Xtranslated(all,Nonzeros[m]);
 #else
       ERROR:  must USE_EIGEN or USE_MINLIN
 #endif

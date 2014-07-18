@@ -28,7 +28,7 @@ void gamma_s( const GenericRowMatrix &X, const GenericColMatrix &theta, const st
 #elif defined( USE_MINLIN )
     {
       GenericVector tmp_nl(nl);
-      gemv_wrapper( tmp_nl.pointer(), TT[k].pointer(), Xtranslated, 1., 0., 'T' );
+      tmp_nl(all) = transpose(Xtranslated) * TT[k];
       geru_wrapper( Xtranslated, TT[k].pointer(), tmp_nl.pointer(), -1.);
     }
 #else
