@@ -1,7 +1,5 @@
-  // Size of space
-#define KSIZE 10
-  // Number of EOF used in final compression
-#define MSIZE 5
+#define KSIZE 10 // default number of clusters
+#define MSIZE 5  // default number of eigenvectors used in final compression
 
 #define MAX_ITER 100
 #define TOL 1.0e-7
@@ -11,6 +9,9 @@
 #include <algorithm>
 #include <mpi.h>
 #include <iostream> 
+
+#include <boost/program_options.hpp>
+namespace po = boost::program_options;
 
 #include "usi_compression.h"
 #include "read_from_netcdf.h"
@@ -83,18 +84,6 @@ int main(int argc, char *argv[])
 {
 
   //
-  // Input Argument Handling
-  //
-
-  if (argc <= 2) {
-    std::cout << "Usage: " << argv[0] << " <Filename>" << " <field name>" << std::endl;
-    exit(1);
-  }
-  std::string filename = argv[1];
-  std::vector<std::string> fields(argv+2, argv+argc); // only the first field is currently used
-
-
-  //
   //  Initialize MPI
   //
 
@@ -107,12 +96,60 @@ int main(int argc, char *argv[])
 
 
   //
+  // Input Argument Handling
+  //
+
+  int M_size, K_size;
+  std::string filename;
+  std::string variable_name;
+  std::vector<std::string> compressed_dims;
+  std::vector<std::string> distributed_dims;
+
+  po::options_description po_description("USI Compression: Options");
+  po_description.add_options()
+    ("help", "display this help message")
+    ("version", "display the version number")
+    ("compressed,c", po::value<std::vector<std::string>>(&compressed_dims)
+        ->default_value({"lon", "lat"}, "lon,lat"), "list of compressed dimensions")
+    ("distributed,d", po::value<std::vector<std::string>>(&distributed_dims)
+        ->default_value({"mlev", "time"}, "mlev,time"), "list of distributed dimensions")
+    ("clusters,K", po::value<int>(&K_size)->default_value(KSIZE),
+        "the number of clusters used for PCA (K)")
+    ("eigenvectors,M", po::value<int>(&M_size)->default_value(MSIZE),
+        "the number of eigenvectors used for final compression (M)")
+    ("file", po::value<std::string>(&filename)->required(),
+        "the path to the NetCDF4 file")
+    ("variable", po::value<std::string>(&variable_name)->required(),
+        "the variable that is to be compressed")
+    ;
+
+  po::positional_options_description po_positional;
+  po_positional.add("file",1).add("variable",1);
+  po::variables_map po_vm;
+  po::store(po::command_line_parser(argc, argv).options(po_description)
+      .positional(po_positional).run(), po_vm);
+
+  if (po_vm.count("help")) {
+    if (!my_rank) std::cout << po_description << std::endl;
+    return 1; // TODO: should this be an error or not?
+  }
+
+  if (po_vm.count("version")) {
+    if (!my_rank) std::cout << "USI Compression, Version " << VERSION << std::endl;
+    return 1; // TODO: should this be an error or not?
+  }
+
+  // this has to be after the help/version commands as this
+  // exits with an error if the required arguments aren't
+  // specified
+  po::notify(po_vm);
+
+
+  //
   // Read NetCDF Data
   //
 
-  std::vector<std::string> compressed_dims = {"lon", "lat"};
-  std::vector<std::string> distributed_dims = {"mlev", "time"};
-  GenericColMatrix X = read_from_netcdf<ScalarType>(filename, fields[0], compressed_dims, distributed_dims);
+  GenericColMatrix X = read_from_netcdf<ScalarType>(filename, variable_name, compressed_dims, distributed_dims);
   
   double time_after_reading_data = MPI_Wtime();
 
@@ -133,17 +170,17 @@ int main(int argc, char *argv[])
   int total_nl = 0;
   MPI_Allgather( &nl, 1, MPI_INT, nl_global, 1, MPI_INT, MPI_COMM_WORLD);
   for ( int rank=0; rank < mpi_processes; rank++ ) { total_nl += nl_global[rank]; } 
-  std::vector<int> gamma_ind = gamma_zero(nl_global, my_rank, KSIZE);
+  std::vector<int> gamma_ind = gamma_zero(nl_global, my_rank, K_size);
   // print out nl sizes of all processes (for debugging)
   // std::cout << "nl sizes "; for ( int rank=0; rank < mpi_processes; rank++ ) { std::cout << nl_global[rank] << " "; } 
   // std::cout << std::endl;
   delete[] nl_global;
 
   // we allocate the matrices used for the algorithm outside of the loop
-  GenericColMatrix theta(Ntl,KSIZE);                   // Time series means (one for each k), allocate outside loop
-  std::vector<GenericColMatrix> TT(KSIZE,GenericColMatrix(Ntl,1) );        // Eigenvectors: 1-each for each k
-  std::vector<GenericColMatrix> EOFs(KSIZE,GenericColMatrix(Ntl,MSIZE) );  // Eigenvectors: MSIZE eigenvectors for each k
-  std::vector<GenericColMatrix> Xreduced(KSIZE,GenericColMatrix(MSIZE, nl) );  // Reduced representation of X
+  GenericColMatrix theta(Ntl,K_size);                   // Time series means (one for each k), allocate outside loop
+  std::vector<GenericColMatrix> TT(K_size,GenericColMatrix(Ntl,1) );        // Eigenvectors: 1-each for each k
+  std::vector<GenericColMatrix> EOFs(K_size,GenericColMatrix(Ntl,M_size) );  // Eigenvectors: M_size eigenvectors for each k
+  std::vector<GenericColMatrix> Xreduced(K_size,GenericColMatrix(M_size, nl) );  // Reduced representation of X
   GenericRowMatrix Xreconstructed(Ntl,nl);                                 // Reconstructed time series 
   GenericRowMatrix Diff(Ntl,nl);                                 // Reconstructed time series 
 
@@ -171,7 +208,7 @@ int main(int argc, char *argv[])
     // Not clear if there should be monotonic decrease here:  new theta_s needs new TT, right?
     
     // Principle Component Analysis for every cluster
-    for(int k = 0; k < KSIZE; k++) {
+    for(int k = 0; k < K_size; k++) {
       std::vector<int> Nonzeros = find( gamma_ind, k );
       GenericColMatrix Xtranslated( Ntl, Nonzeros.size() ) ;
       // if (!my_rank) std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
@@ -215,14 +252,14 @@ int main(int argc, char *argv[])
   theta_s<ScalarType>(gamma_ind, X, theta);
   
   // Principal Component Analysis for every cluster
-  for(int k = 0; k < KSIZE; k++) {
+  for(int k = 0; k < K_size; k++) {
     std::vector<int> Nonzeros = find( gamma_ind, k );
     GenericColMatrix Xtranslated( Ntl, Nonzeros.size() ) ;
     for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
     {
       GET_COLUMN(Xtranslated,m) = GET_COLUMN(X,Nonzeros[m]) - GET_COLUMN(theta,k);  // bsxfun(@minus,X(:,Nonzeros),Theta(:,k))
     }
-    lanczos_correlation(Xtranslated, MSIZE, 1.0e-8, Ntl, EOFs[k], true);
+    lanczos_correlation(Xtranslated, M_size, 1.0e-8, Ntl, EOFs[k], true);
   }
   L_value_new =  L_value( gamma_ind, EOFs, X, theta );
   if (!my_rank) std::cout << "L value final " << L_value_new << std::endl;
@@ -266,7 +303,7 @@ int main(int argc, char *argv[])
   MPI_Allreduce( &time_for_input, &max_time_for_input, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
 
   double size_uncompressed = (double) (Ntl * total_nl);
-  double size_compressed = (double) (KSIZE * ( MSIZE + 1) *( Ntl + total_nl ) );
+  double size_compressed = (double) (K_size * ( M_size + 1) *( Ntl + total_nl ) );
 
   if (!my_rank) std::cout << "Max time for input " << max_time_for_input << std::endl;
   if (!my_rank) std::cout << "Max time for solve " << max_time_for_solve << std::endl;
