@@ -22,8 +22,8 @@
      /* Handle errors by printing an error message and exiting with a
       * non-zero status. */
 
-template <typename ScalarType>
-GenericColMatrix read_from_netcdf(const std::string filename,
+template <typename Scalar>
+GenericMatrix read_from_netcdf(const std::string filename,
                                const std::string variable,
                                const std::vector<std::string> compressed_dimensions,
                                const std::vector<std::string> distributed_dimensions)
@@ -166,8 +166,8 @@ GenericColMatrix read_from_netcdf(const std::string filename,
   //std::cout << std::endl;
 
   // read values for output
-  GenericColMatrix output_matrix(N_rows, N_cols);
-  ScalarType *data = GET_POINTER(output_matrix);
+  GenericMatrix output_matrix(N_rows, N_cols);
+  Scalar *data = GET_POINTER(output_matrix);
   if ((retval = nc_get_varm_double(netcdf_id, variable_id, start, count, NULL, imap, data))) ERR(retval);
 
   // delete working arrays
