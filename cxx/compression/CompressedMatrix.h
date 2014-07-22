@@ -20,7 +20,7 @@ public:
     initialize_data();
     do_iterative_clustering(X);
     do_final_pca(X);
-    calculate_reduced_form();
+    calculate_reduced_form(X);
 
   }
 
@@ -176,9 +176,30 @@ private:
     if (!my_rank_) std::cout << "L value final " << L_value_final << std::endl;
   }
 
-  void calculate_reduced_form() {
-    // TODO
-    return;
+  void calculate_reduced_form(GenericMatrix &X) {
+
+    // This loop can be multithreaded, if all threads have a separate
+    // copy of X_translated
+    GenericMatrix X_translated(Nc_, Nd_);
+    for(int k = 0; k < K_; k++) {
+      std::vector<int> nonzeros = find(cluster_indices_, k);
+
+      // Translate X columns with mean values and project them into subspace
+      // spanned by eigenvectors
+      for (int i = 0; i < nonzeros.size(); i++ ) {
+#if defined( USE_EIGEN )      
+        X_translated.col(nonzeros[i]) = X.col(nonzeros[i])
+            - cluster_means_.col(k);
+        X_reduced_[k].col(nonzeros[i]) = eigenvectors_[k].transpose()
+            * X_translated.col(nonzeros[i]);
+#elif defined( USE_MINLIN )
+        X_translated(all, nonzeros[i]) = X(all, nonzeros[i])
+            - cluster_means_(all,k);
+        X_reduced_[k](all, nonzeros[i]) = transpose(eigenvectors_[k])
+            * X_translated(all,nonzeros[i]);
+#endif
+      }
+    }
   }
 
   void update_cluster_means(const GenericMatrix &X) {
