@@ -19,7 +19,7 @@ public:
 
     initialize_data();
     do_iterative_clustering(X);
-    do_final_pca();
+    do_final_pca(X);
     calculate_reduced_form();
 
   }
@@ -140,25 +140,40 @@ private:
       L_value_new = L_norm(X, TT);
       if (!my_rank_) std::cout << "L value after gamma minimization " << L_value_new << std::endl;
       if ( (L_value_old - L_value_new) < L_value_new*TOL ) {
-        if (!my_rank_) std::cout << " Converged: to tolerance " << TOL << " after " << iter << " iterations " << std::endl;
+        if (!my_rank_) std::cout << " Converged: to tolerance " << TOL
+            << " after " << iter << " iterations " << std::endl;
         break;
       }
       else if ( L_value_new > L_value_old ) { 
-        if (!my_rank_) std::cout << "New L_value " << L_value_new << " larger than old: " << L_value_old << " aborting " << std::endl;
+        if (!my_rank_) std::cout << "New L_value " << L_value_new
+            << " larger than old: " << L_value_old << " aborting" << std::endl;
         break;
       }
       else if ( iter+1 == MAX_ITER ) {
-        if (!my_rank_) std::cout << " Reached maximum number of iterations " << MAX_ITER << " without convergence " << std::endl;
+        if (!my_rank_) std::cout << " Reached maximum number of iterations "
+            << MAX_ITER << " without convergence " << std::endl;
       }
       L_value_old = L_value_new;
     }
-
-    return;
   }
 
-  void do_final_pca() {
-    // TODO
-    return;
+  void do_final_pca(GenericMatrix &X) {
+
+    update_cluster_means(X);
+    
+    // Principal Component Analysis for every cluster
+    for(int k = 0; k < K_; k++) {
+      std::vector<int> nonzeros = find(cluster_indices_, k);
+      GenericMatrix X_translated(Nc_, nonzeros.size());
+      for (int i = 0; i < nonzeros.size(); i++) {
+        // Translate X columns with mean value at new origin
+        GET_COLUMN(X_translated, i) = GET_COLUMN(X, nonzeros[i])
+            - GET_COLUMN(cluster_means_, k);
+      }
+      lanczos_correlation(X_translated, M_, 1.0e-8, Nc_, eigenvectors_[k], true);
+    }
+    Scalar L_value_final = L_norm(X, eigenvectors_);
+    if (!my_rank_) std::cout << "L value final " << L_value_final << std::endl;
   }
 
   void calculate_reduced_form() {
