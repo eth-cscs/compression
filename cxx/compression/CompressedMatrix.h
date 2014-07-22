@@ -203,11 +203,11 @@ private:
 
   void update_cluster_means(const GenericMatrix &X) {
 
-    GenericMatrix local_mean(Nc_,K_);
-    std::vector<int> local_nbr_nonzeros(K_), global_nbr_nonzeros(K_);
 
     // This loop is parallel: No dependencies between the columns
     // (local_vector needs to be private)
+    std::vector<int> local_nbr_nonzeros(K_);
+    std::vector<int> global_nbr_nonzeros(K_);
     for(int k = 0; k < K_; k++) {
       std::vector<int> nonzeros = find(cluster_indices_, k);
       local_nbr_nonzeros[k] = nonzeros.size();
@@ -217,6 +217,7 @@ private:
 
     // This loop is parallel: No dependencies between the columns
     // (local_vector needs to be private)
+    GenericMatrix local_means(Nc_,K_);
     for(int k = 0; k < K_; k++) {
       
       // Could use a matrix for this to avoid 2nd load;
@@ -227,23 +228,34 @@ private:
       
       if (sum_gamma > 0) {
 #if defined( USE_EIGEN )
-        local_mean.col(k) =  Eigen::MatrixXd::Zero(Ntl, 1);
+        local_means.col(k) =  Eigen::MatrixXd::Zero(Ntl, 1);
         for (int i = 0; i < nonzeros.size(); i++ ) {
-          local_mean.col(k) += X.col(nonzeros[i]);  
+          local_means.col(k) += X.col(nonzeros[i]);  
         }
-        local_mean.col(k) /= sum_gamma;
+        local_means.col(k) /= sum_gamma;
 #elif defined( USE_MINLIN )
-        local_mean(all,k) =  0.;
+        local_means(all,k) =  0.;
         for (int i = 0; i < nonzeros.size() ; i++ ) {
-          local_mean(all,k) += X(all,nonzeros[i]);  
+          local_means(all,k) += X(all,nonzeros[i]);  
         }
-        local_mean(all,k) /= sum_gamma;
+        local_means(all,k) /= sum_gamma;
 #endif
       }
     }
 
-    MPI_Allreduce(GET_POINTER(local_mean), GET_POINTER(cluster_means_), Nc_*K_,
+#if defined(USE_GPU)
+    // We need to copy the matrix to the host in order to do the MPI 
+    // Allreduce call. After that we copy it back to the device.
+    HostMatrix<Scalar> tmp_local(Nc_,K_);
+    HostMatrix<Scalar> tmp_global(Nc_, K_);
+    tmp_local = local_means;
+    MPI_Allreduce(tmp_local.pointer(), tmp_global.pointer(), Nc_*K_,
         MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    cluster_means_ = tmp_global;
+#else
+    MPI_Allreduce(GET_POINTER(local_means), GET_POINTER(cluster_means_), Nc_*K_,
+        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+#endif
   }
 
   Scalar L_norm(GenericMatrix &X, std::vector<GenericMatrix> &EOFs) {

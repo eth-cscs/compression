@@ -167,8 +167,17 @@ GenericMatrix read_from_netcdf(const std::string filename,
 
   // read values for output
   GenericMatrix output_matrix(N_rows, N_cols);
-  Scalar *data = GET_POINTER(output_matrix);
-  if ((retval = nc_get_varm_double(netcdf_id, variable_id, start, count, NULL, imap, data))) ERR(retval);
+#if defined(USE_GPU)
+  // if we want to use the GPU, we first need to read the matrix to the
+  // host and copy it over to the device
+  HostMatrix<Scalar> temp_matrix(N_rows, N_cols);
+  if ((retval = nc_get_varm_double(netcdf_id, variable_id, start, count, NULL,
+          imap, temp_matrix.pointer()))) ERR(retval);
+  output_matrix = temp_matrix;
+#else
+  if ((retval = nc_get_varm_double(netcdf_id, variable_id, start, count, NULL,
+          imap, GET_POINTER(output_matrix)))) ERR(retval);
+#endif
 
   // delete working arrays
   delete[] dimension_ids;

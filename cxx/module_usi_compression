@@ -11,6 +11,9 @@ module load cmake
 module load craype-accel-nvidia35
 module load cray-netcdf-hdf5parallel
 module load cray-hdf5-parallel
+module load cray-mpich
+module swap gcc/4.8.2
+module load intel
 
 # add ld library path
 prepend-path LD_LIBRARY_PATH /opt/intel/14.0.1.106/composer_xe_2013_sp1.1.106/mkl/lib/intel64

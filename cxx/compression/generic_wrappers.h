@@ -44,10 +44,10 @@ bool steigs
     num_eigs = num_eigs>n ? n : num_eigs;
 
     // allocate memory for arrays used by LAPACK
-    real *e = new real[sizeof(real)*(n-1)];   // superdiagonal
-    real *z = new real[sizeof(real)*(n*n)];   // eigenvectors returned by LAPACK
-    real *d = new real[sizeof(real)*n];       // diagonal, used by ?steqr for storing eigenvalues
-    real *work = new real[sizeof(real)*2*n];  // working array for LAPACK
+    real *e = new real[(n-1)];   // superdiagonal
+    real *z = new real[(n*n)];   // eigenvectors returned by LAPACK
+    real *d = new real[n];       // diagonal, used by ?steqr for storing eigenvalues
+    real *work = new real[2*n];  // working array for LAPACK
 
     // pack the diagonal and super diagonal of T
     int pos=0;

@@ -53,7 +53,7 @@ bool geru_wrapper( GenericMatrix &A, const double* x, const double* y,
 #ifdef USE_GPU
   cublasHandle_t handle = CublasState::instance()->handle();
   cublasStatus_t status = cublasDger(handle, A.rows(), A.cols(), &alpha,
-      x, inc, &beta, y, inc, A.pointer(), A.rows());
+      x, inc, y, inc, A.pointer(), A.rows());
   return (status==CUBLAS_STATUS_SUCCESS);
 #else
   const int m = A.rows();

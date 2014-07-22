@@ -13,7 +13,7 @@
 
 
 template <typename ScalarType>
-bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize=false)
+bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize)
 {
   int N = Xtranslated.rows();
   ScalarType gamma, delta;

@@ -9,7 +9,11 @@
 typedef double Scalar;     // feel free to change this to 'double' if supported by your hardware
 
 
+
+#if defined(USE_EIGEN)
 #include <random>
+#endif
+
 #include <algorithm>
 #include <mpi.h>
 #include <mkl.h>
@@ -102,15 +106,24 @@ int main(int argc, char *argv[])
   std::vector<std::string> compressed_dims;
   std::vector<std::string> distributed_dims;
 
+  std::vector<std::string> default_compressed_dims;
+  default_compressed_dims.push_back("lon");
+  default_compressed_dims.push_back("lat");
+  std::vector<std::string> default_distributed_dims;
+  default_distributed_dims.push_back("mlev");
+  default_distributed_dims.push_back("time");
+
   namespace po = boost::program_options;
   po::options_description po_description("USI Compression: Options");
   po_description.add_options()
     ("help", "display this help message")
     ("version", "display the version number")
-    ("compressed,c", po::value<std::vector<std::string>>(&compressed_dims)
-        ->default_value({"lon", "lat"}, "lon,lat"), "list of compressed dimensions")
-    ("distributed,d", po::value<std::vector<std::string>>(&distributed_dims)
-        ->default_value({"mlev", "time"}, "mlev,time"), "list of distributed dimensions")
+    ("compressed,c", po::value< std::vector<std::string> >(&compressed_dims)
+        ->default_value(default_compressed_dims, "lon,lat"), 
+        "list of compressed dimensions")
+    ("distributed,d", po::value< std::vector<std::string> >(&distributed_dims)
+        ->default_value(default_distributed_dims, "mlev,time"), 
+        "list of distributed dimensions")
     ("clusters,K", po::value<int>(&K_size)->default_value(KSIZE),
         "the number of clusters used for PCA (K)")
     ("eigenvectors,M", po::value<int>(&M_size)->default_value(MSIZE),

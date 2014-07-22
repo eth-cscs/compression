@@ -17,7 +17,7 @@
 
 
 template <typename ScalarType>
-bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize=false)
+bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize)
 {
   int N = Xtranslated.rows(); // this corresponds to Ntl in usi_compression.cpp
   ScalarType gamma, delta;
@@ -31,7 +31,7 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
   GenericMatrix V(N,max_iter);  // transformation
   V(all,0) = ScalarType(1.); //TODO: make this a random vector
   V(all,0) /= norm(V(all,0));    // Unit vector
-  GenericMatrix Trid(max_iter,max_iter);  // Tridiagonal
+  HostMatrix<ScalarType> Trid(max_iter,max_iter);  // Tridiagonal
   Trid(all) = 0.;                            // Matrix must be zeroed out
   
   // preallocate storage vectors
@@ -52,7 +52,16 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
     // do not attempt to participate in the calculation
     tmp_vector(all) = 0;
   }
+#if defined(USE_GPU)
+  HostVector<ScalarType> tmp_local(N);
+  HostVector<ScalarType> tmp_global(N);
+  tmp_local = tmp_vector;
+  MPI_Allreduce(tmp_local.pointer(), tmp_global.pointer(), N,
+      MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  w = tmp_global;
+#else
   MPI_Allreduce( tmp_vector.pointer(), w.pointer(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+#endif
   delta = dot(w, V(all,0));
   Trid(0,0) = delta;  // store in tridiagonal matrix
 
@@ -90,7 +99,14 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
       // do not attempt to participate in the calculation
       r(all) = 0;
     }
+#if defined(USE_GPU)
+    tmp_local = r;
+    MPI_Allreduce(tmp_local.pointer(), tmp_global.pointer(), N,
+        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    w = tmp_global;
+#else
     MPI_Allreduce( GET_POINTER(r), GET_POINTER(w), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+#endif
 
     // update diagonal of tridiagonal system
     delta = DOT_PRODUCT( w, GET_COLUMN(V,j) );
@@ -102,7 +118,7 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
     if ( j >= ne ) {
 
       // find eigenvectors/eigenvalues for the reduced triangular system
-      GenericVector eigs(ne);
+      HostVector<ScalarType> eigs(ne);
       
       HostMatrix<ScalarType> Tsub = Trid(0,j,0,j);
       HostMatrix<ScalarType> UVhost(j+1,ne);
@@ -143,7 +159,14 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
         // find the residual
         // r = Xtranslated*( Xtranslated.transpose() * EV.col(count) ) - this_eig*EV.col(count);
         // Global summation or matrix product
+#if defined(USE_GPU)
+        tmp_local = tmp_vector;
+        MPI_Allreduce(tmp_local.pointer(), tmp_global.pointer(), N,
+            MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        r = tmp_global;
+#else
         MPI_Allreduce( GET_POINTER(tmp_vector), GET_POINTER(r), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+#endif
         // compute the relative error from the residual
         r -= GET_COLUMN(EV,count) * this_eig;   //residual
         ScalarType this_err = std::abs( NORM(r) / this_eig );
