@@ -170,6 +170,40 @@ private:
     return;
   }
 
+  void update_clustering(const GenericMatrix &X, const GenericMatrix &TT) {
+
+    std::vector<Scalar> smallest_norm(Nd_, std::numeric_limits<Scalar>::max());
+
+    GenericMatrix X_translated(Nc_, Nd_);
+#if defined(USE_MINLIN)
+    GenericVector tmp_Nd(Nd_); // used in for loop
+#endif
+
+    // This loop can be multithreaded, if all threads have a separate
+    // copy of Xtranslated
+    for(int k = 0; k < K_; k++) {
+
+      // Translate each column of X. This loop can be multithreaded!
+      for(int i=0; i<Nd_; i++) GET_COLUMN(X_translated,i) = GET_COLUMN(X,i)
+          - GET_COLUMN(cluster_means_,k);
+
+#if defined(USE_EIGEN)
+      X_translated -= TT[k] * (TT[k].transpose() * X_translated);
+#elif defined(USE_MINLIN)
+      tmp_Nd(all) = transpose(X_translated) * TT[k];
+      geru_wrapper(X_translated, TT[k].pointer(), tmp_Nd.pointer(), -1.);
+#endif
+
+      for(int i=0; i<Nd_; i++) {
+        Scalar this_norm = NORM(GET_COLUMN(X_translated,i));
+        if(this_norm<smallest_norm[i]) {
+          smallest_norm[i] = this_norm;
+          cluster_indices[i] = k;
+        }
+      }
+    }
+  }
+
   std::vector<int> find(const std::vector<int> int_vector, const int k) {
     std::vector<int> found_items;
     for (int i=0; i<int_vector.size(); i++) {
