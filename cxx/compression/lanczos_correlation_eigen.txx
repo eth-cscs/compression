@@ -13,7 +13,7 @@
 
 
 template <typename ScalarType>
-bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericColMatrix &EV, bool reorthogonalize=false)
+bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize=false)
 {
   int N = Xtranslated.rows();
   ScalarType gamma, delta;
@@ -24,7 +24,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   assert(EV.cols() == ne);
   assert(N         >= max_iter);
 
-  GenericColMatrix V(N,max_iter);  // transformation
+  GenericMatrix V(N,max_iter);  // transformation
 
   GenericVector w(N);
 
@@ -35,7 +35,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   //V.col(0).setOnes();     // Simple initial vector; no apparent side effects
   V.col(0).setRandom();     // Random initial vector, all nodes must generate same vector so use srand(RANDOM_SEED) in caller
   V.col(0) /= V.col(0).norm();    // Unit vector
-  GenericColMatrix Trid = GenericColMatrix::Zero(max_iter,max_iter);  // Tridiagonal
+  GenericMatrix Trid = GenericMatrix::Zero(max_iter,max_iter);  // Tridiagonal
   if (Xtranslated.cols() > 0) {
     tmp_vector = Xtranslated*(Xtranslated.transpose()*V.col(0));  // order important! evaluate right to left to save calculation!
   } else {
@@ -92,18 +92,18 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
       // find eigenvectors/eigenvalues for the reduced triangular system
 
 #if defined( EIGEN_EIGENSOLVE )
-      Eigen::SelfAdjointEigenSolver<GenericColMatrix> eigensolver(Trid.block(0,0,j+1,j+1));
+      Eigen::SelfAdjointEigenSolver<GenericMatrix> eigensolver(Trid.block(0,0,j+1,j+1));
       if (eigensolver.info() != Eigen::Success) abort();
       GenericVector  eigs = eigensolver.eigenvalues().block(j+1-ne,0,ne,1);  // ne largest Ritz values, sorted ascending
-      GenericColMatrix UT = eigensolver.eigenvectors();   // Ritz vectors
+      GenericMatrix UT = eigensolver.eigenvectors();   // Ritz vectors
       // std::cout << "iteration : " << j << ", Tblock : " << Trid.block(0,0,j+1,j+1) << std::endl;
       // std::cout << "iteration : " << j << ", ritz values " << eigs << std::endl;
       // std::cout << "iteration : " << j << ", ritz vectors " << UT << std::endl;
       // j or j+1 ??
       EV = V.block(0,0,N,j+1)*UT.block(0,j+1-ne,j+1,ne);  // Eigenvector approximations for largest ne eigenvalues
 #else
-      GenericColMatrix Tsub = Trid.block(0,0,j+1,j+1);
-      GenericColMatrix UT(j+1,ne);
+      GenericMatrix Tsub = Trid.block(0,0,j+1,j+1);
+      GenericMatrix UT(j+1,ne);
       GenericVector  eigs(j+1);
       // TODO:  ensure that eigenvalues have ascending order
       assert( steigs( Tsub.data(), UT.data(), eigs.data(), j+1, ne) );

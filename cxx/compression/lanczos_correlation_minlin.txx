@@ -17,7 +17,7 @@
 
 
 template <typename ScalarType>
-bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericColMatrix &EV, bool reorthogonalize=false)
+bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize=false)
 {
   int N = Xtranslated.rows(); // this corresponds to Ntl in usi_compression.cpp
   ScalarType gamma, delta;
@@ -28,10 +28,10 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
   assert(N         >= max_iter);
 
   // set up matrices for Arnoldi decomposition
-  GenericColMatrix V(N,max_iter);  // transformation
+  GenericMatrix V(N,max_iter);  // transformation
   V(all,0) = ScalarType(1.); //TODO: make this a random vector
   V(all,0) /= norm(V(all,0));    // Unit vector
-  GenericColMatrix Trid(max_iter,max_iter);  // Tridiagonal
+  GenericMatrix Trid(max_iter,max_iter);  // Tridiagonal
   Trid(all) = 0.;                            // Matrix must be zeroed out
   
   // preallocate storage vectors
@@ -112,7 +112,7 @@ bool lanczos_correlation(const GenericColMatrix &Xtranslated, const int ne, cons
       assert( steigs( Tsub.pointer(), UVhost.pointer(), eigs.pointer(), j+1, ne) );
       
       // copy eigenvectors for reduced system to the device
-      GenericColMatrix UV = UVhost;
+      GenericMatrix UV = UVhost;
 
       // find approximate eigenvectors of full system
       EV = V(all,0,j)*UV;
