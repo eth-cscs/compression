@@ -85,9 +85,8 @@ private:
     for (int i=0; i<Nd_; i++) cluster_indices_[i] = (cluster_start+i)%K_;
 
     // set up sizes
-    original_size = Nc_ * Nd_;
-    int total_Nd = Nd_; // TODO: get global Nd
-    compressed_size = (K_ * ( M_ + 1) * (Nc_ + total_Nd));
+    original_size = Nc_ * Nd_total_;
+    compressed_size = (K_ * (M_ + 1) * (Nc_ + Nd_total_));
 
   }
 
