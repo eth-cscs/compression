@@ -28,7 +28,7 @@ public:
     GenericMatrix X_reconstructed(Nc_, Nd_);
 
     // This loop can be multithreaded, if all threads have a separate
-    // copy of Xtranslated
+    // copy of X_translated
     for(int k = 0; k < K_; k++) {
       std::vector<int> nonzeros = find(cluster_indices_, k);
       for (int m = 0; m < nonzeros.size() ; m++ ) {       
@@ -115,13 +115,13 @@ private:
       // Principle Component Analysis for every cluster
       for(int k = 0; k < K_size; k++) {
         std::vector<int> nonzeros = find( gamma_ind, k );
-        GenericColMatrix Xtranslated( Ntl, nonzeros.size() ) ;
+        GenericColMatrix X_translated( Ntl, nonzeros.size() ) ;
         // if (!my_rank) std::cout << " For k = " << k << " nbr nonzeros " << nonzeros.size() << std::endl;
         for (int m = 0; m < nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
         {
-          GET_COLUMN(Xtranslated,m) = GET_COLUMN(X,nonzeros[m]) - GET_COLUMN(theta,k) ; 
+          GET_COLUMN(X_translated,m) = GET_COLUMN(X,nonzeros[m]) - GET_COLUMN(theta,k) ; 
         }
-        bool success = lanczos_correlation(Xtranslated, 1, 1.0e-11, 50, TT[k], true);
+        bool success = lanczos_correlation(X_translated, 1, 1.0e-11, 50, TT[k], true);
       }
 
       // we calculate the L value here for output only (TODO: remove this for optimization later)
@@ -215,6 +215,47 @@ private:
         MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   }
 
+  Scalar L_norm(GenericMatrix &X, std::vector<GenericMatrix> &EOFs) {
+
+    // This loop can be multithreaded, if all threads have a separate
+    // copy of X_translated
+    GenericColMatrix X_translated(Nc_, Nd_);
+#if defined(USE_MINLIN)
+    GenericVector tmp_K(EOFs[0].cols()); // just 1 entry during clustering
+    GenericVector tmp_Nc(Nc_);
+#endif
+    for(int k = 0; k < K_; k++) {
+      std::vector<int> nonzeros = find(clustering_indices, k);
+
+      // Translate X columns with mean value and subtract projection
+      // into subspace spanned by eigenvector(s)
+      for (int i = 0; i < nonzeros.size() ; i++ ) {
+#if defined( USE_EIGEN )      
+        X_translated.col(nonzeros[i])  = X.col(nonzeros[i]) - theta.col(k);
+        X_translated.col(nonzeros[i]) -=  EOFs[k] * (EOFs[k].transpose()
+            * X_translated.col(nonzeros[i]));
+#elif defined( USE_MINLIN )
+        X_translated(all,nonzeros[i])  = X(all,nonzeros[m]) - theta(all,k);
+        tmp_K(all) = transpose(EOFs[k]) * X_translated(all,nonzeros[i]);
+        tmp_Nc(all) = EOFs[k] * tmp_K;
+        X_translated(all,nonzeros[i]) -= tmp_Nc;
+#endif
+      }
+    }
+
+    // Now X_translated contains the residuals of the column vectors,
+    // the square norms just need to be summed
+    Scalar local_norm = 0.0;
+    for (int i = 0; i < Nc_; i++ ) {
+      Scalar colnorm = GET_NORM(GET_COLUMN(X_translated, i));
+      local_norm += colnorm * colnorm;
+    }
+    Scalar global_norm = 0.0;
+    MPI_Allreduce(&local_norm, &global_norm, 1, MPI_DOUBLE, MPI_SUM, 
+        MPI_COMM_WORLD);
+    return global_norm;
+  }
+
   void update_clustering(const GenericMatrix &X, const GenericMatrix &TT) {
 
     std::vector<Scalar> smallest_norm(Nd_, std::numeric_limits<Scalar>::max());
@@ -225,7 +266,7 @@ private:
 #endif
 
     // This loop can be multithreaded, if all threads have a separate
-    // copy of Xtranslated
+    // copy of X_translated
     for(int k = 0; k < K_; k++) {
 
       // Translate each column of X. This loop can be multithreaded!
