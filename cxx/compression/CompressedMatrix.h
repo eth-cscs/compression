@@ -30,11 +30,11 @@ public:
     // This loop can be multithreaded, if all threads have a separate
     // copy of Xtranslated
     for(int k = 0; k < K_; k++) {
-      std::vector<int> Nonzeros = find(cluster_indices_, k);
-      for (int m = 0; m < Nonzeros.size() ; m++ ) {       
-        GET_COLUMN(X_reconstructed, Nonzeros[m]) = eigenvectors_[k]
-            * GET_COLUMN(X_reduced_[k], Nonzeros[m]);
-        GET_COLUMN(X_reconstructed, Nonzeros[m]) += GET_COLUMN(cluster_means_, k);
+      std::vector<int> nonzeros = find(cluster_indices_, k);
+      for (int m = 0; m < nonzeros.size() ; m++ ) {       
+        GET_COLUMN(X_reconstructed, nonzeros[m]) = eigenvectors_[k]
+            * GET_COLUMN(X_reduced_[k], nonzeros[m]);
+        GET_COLUMN(X_reconstructed, nonzeros[m]) += GET_COLUMN(cluster_means_, k);
       }
     }
 
@@ -114,12 +114,12 @@ private:
       
       // Principle Component Analysis for every cluster
       for(int k = 0; k < K_size; k++) {
-        std::vector<int> Nonzeros = find( gamma_ind, k );
-        GenericColMatrix Xtranslated( Ntl, Nonzeros.size() ) ;
-        // if (!my_rank) std::cout << " For k = " << k << " nbr nonzeros " << Nonzeros.size() << std::endl;
-        for (int m = 0; m < Nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
+        std::vector<int> nonzeros = find( gamma_ind, k );
+        GenericColMatrix Xtranslated( Ntl, nonzeros.size() ) ;
+        // if (!my_rank) std::cout << " For k = " << k << " nbr nonzeros " << nonzeros.size() << std::endl;
+        for (int m = 0; m < nonzeros.size() ; m++ )        // Translate X columns with mean value at new origin
         {
-          GET_COLUMN(Xtranslated,m) = GET_COLUMN(X,Nonzeros[m]) - GET_COLUMN(theta,k) ; 
+          GET_COLUMN(Xtranslated,m) = GET_COLUMN(X,nonzeros[m]) - GET_COLUMN(theta,k) ; 
         }
         bool success = lanczos_correlation(Xtranslated, 1, 1.0e-11, 50, TT[k], true);
       }
@@ -170,6 +170,51 @@ private:
     return;
   }
 
+  void update_cluster_means(const GenericMatrix &X) {
+
+    GenericColMatrix local_mean(Nc_,K_);
+    std::vector<int> local_nbr_nonzeros(K_), global_nbr_nonzeros(K_);
+
+    // This loop is parallel: No dependencies between the columns
+    // (local_vector needs to be private)
+    for(int k = 0; k < K_; k++) {
+      std::vector<int> nonzeros = find(cluster_indices_, k);
+      local_nbr_nonzeros[k] = nonzeros.size();
+    }   
+    MPI_Allreduce(local_nbr_nonzeros.data(), global_nbr_nonzeros.data(), K_, 
+        MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+    // This loop is parallel: No dependencies between the columns
+    // (local_vector needs to be private)
+    for(int k = 0; k < K_; k++) {
+      
+      // Could use a matrix for this to avoid 2nd load;
+      std::vector<int> nonzeros = find(cluster_indices, k);   
+      
+      // Number of entries containing each index
+      Scalar sum_gamma = static_cast<Scalar> (global_nbr_nonzeros[k]);
+      
+      if (sum_gamma > 0) {
+#if defined( USE_EIGEN )
+        local_mean.col(k) =  Eigen::MatrixXd::Zero(Ntl, 1);
+        for (int i = 0; i < nonzeros.size(); i++ ) {
+          local_mean.col(k) += X.col(nonzeros[i]);  
+        }
+        local_mean.col(k) /= sum_gamma;
+#elif defined( USE_MINLIN )
+        local_mean(all,k) =  0.;
+        for (int i = 0; i < nonzeros.size() ; i++ ) {
+          local_mean(all,k) += X(all,nonzeros[i]);  
+        }
+        local_mean(all,k) /= sum_gamma;
+#endif
+      }
+    }
+
+    MPI_Allreduce(GET_POINTER(local_mean), GET_POINTER(column_means_), Nc_*K_,
+        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  }
+
   void update_clustering(const GenericMatrix &X, const GenericMatrix &TT) {
 
     std::vector<Scalar> smallest_norm(Nd_, std::numeric_limits<Scalar>::max());
@@ -211,7 +256,5 @@ private:
     }
     return found_items;
   }
-
-
 
 };
