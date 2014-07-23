@@ -85,7 +85,7 @@ bool steigs
 }
 
 template <typename Scalar>
-bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const Scalar tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize = false)
+bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, const Scalar tol, const int max_iter, DeviceMatrix<Scalar> &EV, bool reorthogonalize = false)
 {
   int N = Xtranslated.rows(); // this corresponds to Ntl in usi_compression.cpp
   Scalar gamma, delta;
@@ -96,17 +96,17 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
   assert(N         >= max_iter);
 
   // set up matrices for Arnoldi decomposition
-  GenericMatrix V(N,max_iter);  // transformation
+  DeviceMatrix<Scalar> V(N,max_iter);  // transformation
   V(all,0) = Scalar(1.); //TODO: make this a random vector
   V(all,0) /= norm(V(all,0));    // Unit vector
   HostMatrix<Scalar> Trid(max_iter,max_iter);  // Tridiagonal
   Trid(all) = 0.;                            // Matrix must be zeroed out
   
   // preallocate storage vectors
-  GenericVector r(N);   // residual, temporary
-  GenericVector w(N);
-  GenericVector tmp_vector(N);   // temporary
-  GenericVector tmp_ne(Xtranslated.cols()); // used for storing intermediate result because
+  DeviceVector<Scalar> r(N);   // residual, temporary
+  DeviceVector<Scalar> w(N);
+  DeviceVector<Scalar> tmp_vector(N);   // temporary
+  DeviceVector<Scalar> tmp_ne(Xtranslated.cols()); // used for storing intermediate result because
                                             // minlin cannot do A*(A.T*v) efficiently
 
   // calculate the first entry of the tridiagonal matrix
@@ -196,7 +196,7 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
       assert( steigs( Tsub.pointer(), UVhost.pointer(), eigs.pointer(), j+1, ne) );
       
       // copy eigenvectors for reduced system to the device
-      GenericMatrix UV = UVhost;
+      DeviceMatrix<Scalar> UV = UVhost;
 
       // find approximate eigenvectors of full system
       EV = V(all,0,j)*UV;

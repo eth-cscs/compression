@@ -15,7 +15,7 @@ public:
   int original_size;
   int compressed_size;
 
-  CompressedMatrix(GenericMatrix &X, const int K, const int M) {
+  CompressedMatrix(DeviceMatrix<Scalar> &X, const int K, const int M) {
 
     Nc_ = X.rows(); // number of entries along compressed direction
     Nd_ = X.cols(); // number of entries along distributed direction
@@ -29,9 +29,9 @@ public:
 
   }
 
-  GenericMatrix reconstruct() {
+  DeviceMatrix<Scalar> reconstruct() {
 
-    GenericMatrix X_reconstructed(Nc_, Nd_);
+    DeviceMatrix<Scalar> X_reconstructed(Nc_, Nd_);
 
     // This loop can be multithreaded, if all threads have a separate
     // copy of X_translated
@@ -51,9 +51,9 @@ public:
 private:
 
   // data structures for reduced representation
-  std::vector<GenericMatrix> X_reduced_;
-  GenericMatrix cluster_means_;
-  std::vector<GenericMatrix> eigenvectors_;
+  std::vector< DeviceMatrix<Scalar> > X_reduced_;
+  DeviceMatrix<Scalar> cluster_means_;
+  std::vector< DeviceMatrix<Scalar> > eigenvectors_;
   std::vector<int> cluster_indices_;
 
   // data sizes
@@ -80,9 +80,9 @@ private:
 
     // set up data
     cluster_indices_ = std::vector<int>(Nd_, 0);
-    cluster_means_ = GenericMatrix(Nc_, K_);
-    eigenvectors_ = std::vector<GenericMatrix>(K_, GenericMatrix(Nc_, M_));
-    X_reduced_ = std::vector<GenericMatrix>(K_, GenericMatrix(M_, Nd_));
+    cluster_means_ = DeviceMatrix<Scalar>(Nc_, K_);
+    eigenvectors_ = std::vector< DeviceMatrix<Scalar> >(K_, DeviceMatrix<Scalar>(Nc_, M_));
+    X_reduced_ = std::vector< DeviceMatrix<Scalar> >(K_, DeviceMatrix<Scalar>(M_, Nd_));
     
     // initialize clusters independent from number of processes
     int cluster_start = 0;
@@ -97,10 +97,10 @@ private:
 
   }
 
-  void do_iterative_clustering(GenericMatrix &X) {
+  void do_iterative_clustering(DeviceMatrix<Scalar> &X) {
 
     // eigenvectors: 1 for each k
-    std::vector<GenericMatrix> TT(K_, GenericMatrix(Nc_, 1));
+    std::vector< DeviceMatrix<Scalar> > TT(K_, DeviceMatrix<Scalar>(Nc_, 1));
 
     Scalar L_value_old = 1.0e19;   // Very big value
     Scalar L_value_new;
@@ -125,7 +125,7 @@ private:
       // Principle Component Analysis for every cluster
       for(int k = 0; k < K_; k++) {
         std::vector<int> nonzeros = find(cluster_indices_, k);
-        GenericMatrix X_translated(Nc_, nonzeros.size()) ;
+        DeviceMatrix<Scalar> X_translated(Nc_, nonzeros.size()) ;
         for (int m = 0; m < nonzeros.size() ; m++ ) {
           // Translate X columns with mean value at new origin
           GET_COLUMN(X_translated, m) = GET_COLUMN(X, nonzeros[m])
@@ -163,14 +163,14 @@ private:
     }
   }
 
-  void do_final_pca(GenericMatrix &X) {
+  void do_final_pca(DeviceMatrix<Scalar> &X) {
 
     update_cluster_means(X);
     
     // Principal Component Analysis for every cluster
     for(int k = 0; k < K_; k++) {
       std::vector<int> nonzeros = find(cluster_indices_, k);
-      GenericMatrix X_translated(Nc_, nonzeros.size());
+      DeviceMatrix<Scalar> X_translated(Nc_, nonzeros.size());
       for (int i = 0; i < nonzeros.size(); i++) {
         // Translate X columns with mean value at new origin
         GET_COLUMN(X_translated, i) = GET_COLUMN(X, nonzeros[i])
@@ -182,11 +182,11 @@ private:
     if (!my_rank_) std::cout << "L value final " << L_value_final << std::endl;
   }
 
-  void calculate_reduced_form(GenericMatrix &X) {
+  void calculate_reduced_form(DeviceMatrix<Scalar> &X) {
 
     // This loop can be multithreaded, if all threads have a separate
     // copy of X_translated
-    GenericMatrix X_translated(Nc_, Nd_);
+    DeviceMatrix<Scalar> X_translated(Nc_, Nd_);
     for(int k = 0; k < K_; k++) {
       std::vector<int> nonzeros = find(cluster_indices_, k);
 
@@ -208,7 +208,7 @@ private:
     }
   }
 
-  void update_cluster_means(const GenericMatrix &X) {
+  void update_cluster_means(const DeviceMatrix<Scalar> &X) {
 
 
     // This loop is parallel: No dependencies between the columns
@@ -224,7 +224,7 @@ private:
 
     // This loop is parallel: No dependencies between the columns
     // (local_vector needs to be private)
-    GenericMatrix local_means(Nc_,K_);
+    DeviceMatrix<Scalar> local_means(Nc_,K_);
     for(int k = 0; k < K_; k++) {
       
       // Could use a matrix for this to avoid 2nd load;
@@ -265,14 +265,14 @@ private:
 #endif
   }
 
-  Scalar L_norm(GenericMatrix &X, std::vector<GenericMatrix> &EOFs) {
+  Scalar L_norm(DeviceMatrix<Scalar> &X, std::vector< DeviceMatrix<Scalar> > &EOFs) {
 
     // This loop can be multithreaded, if all threads have a separate
     // copy of X_translated
-    GenericMatrix X_translated(Nc_, Nd_);
+    DeviceMatrix<Scalar> X_translated(Nc_, Nd_);
 #if defined(USE_MINLIN)
-    GenericVector tmp_K(EOFs[0].cols()); // just 1 entry during clustering
-    GenericVector tmp_Nc(Nc_);
+    DeviceVector<Scalar> tmp_K(EOFs[0].cols()); // just 1 entry during clustering
+    DeviceVector<Scalar> tmp_Nc(Nc_);
 #endif
     for(int k = 0; k < K_; k++) {
       std::vector<int> nonzeros = find(cluster_indices_, k);
@@ -306,13 +306,13 @@ private:
     return global_norm;
   }
 
-  void update_clustering(const GenericMatrix &X, const std::vector<GenericMatrix> &TT) {
+  void update_clustering(const DeviceMatrix<Scalar> &X, const std::vector< DeviceMatrix<Scalar> > &TT) {
 
     std::vector<Scalar> smallest_norm(Nd_, std::numeric_limits<Scalar>::max());
 
-    GenericMatrix X_translated(Nc_, Nd_);
+    DeviceMatrix<Scalar> X_translated(Nc_, Nd_);
 #if defined(USE_MINLIN)
-    GenericVector tmp_Nd(Nd_); // used in for loop
+    DeviceVector<Scalar> tmp_Nd(Nd_); // used in for loop
 #endif
 
     // This loop can be multithreaded, if all threads have a separate

@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
   // Read NetCDF Data
   //
 
-  GenericMatrix X = read_from_netcdf<Scalar>(filename, variable_name, compressed_dims, distributed_dims);
+  DeviceMatrix<Scalar> X = read_from_netcdf<Scalar>(filename, variable_name, compressed_dims, distributed_dims);
   
   double time_after_reading_data = MPI_Wtime();
 
@@ -178,8 +178,8 @@ int main(int argc, char *argv[])
   // Reconstruct Matrix & Measure Difference
   //
 
-  GenericMatrix X_reconstructed = X_compressed.reconstruct();
-  GenericMatrix X_difference = X_reconstructed - X;
+  DeviceMatrix<Scalar> X_reconstructed = X_compressed.reconstruct();
+  DeviceMatrix<Scalar> X_difference = X_reconstructed - X;
 
   Scalar column_norm;
   Scalar local_square_norm = 0.0;

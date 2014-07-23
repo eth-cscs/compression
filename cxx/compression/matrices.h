@@ -9,11 +9,10 @@
 #define NORM( VECTOR )                     VECTOR.norm()
 #include <Eigen/Dense>
 
-typedef Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> MatrixXX;
-typedef Eigen::Matrix<Scalar, Eigen::Dynamic, 1> VectorX;
-
-typedef MatrixXX    GenericMatrix;
-typedef VectorX     GenericVector;
+template<class Scalar> using HostMatrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+template<class Scalar> using DeviceMatrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+template<class Scalar> using HostVector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
+template<class Scalar> using DeviceVector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
 
 #elif defined( USE_MINLIN )
 
@@ -36,17 +35,10 @@ MINLIN_INIT
 #include <cublas_v2.h>
 #endif
 
-#if defined( USE_GPU )
-typedef DeviceMatrix<Scalar>  GenericMatrix;
-typedef DeviceVector<Scalar>  GenericVector;
-#else
-typedef HostMatrix<Scalar>  GenericMatrix;
-typedef HostVector<Scalar>  GenericVector;
-#endif
-
 // double precision geru (rank-1 update)
 // A <- A - alpha*x*y'
-bool geru_wrapper( GenericMatrix &A, const double* x, const double* y, 
+template<typename Scalar>
+bool geru_wrapper( DeviceMatrix<Scalar> &A, const double* x, const double* y, 
     double alpha )
 {
   const int inc = 1;

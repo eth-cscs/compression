@@ -23,7 +23,7 @@
       * non-zero status. */
 
 template <typename Scalar>
-GenericMatrix read_from_netcdf(const std::string filename,
+DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
                                const std::string variable,
                                const std::vector<std::string> compressed_dimensions,
                                const std::vector<std::string> distributed_dimensions)
@@ -166,7 +166,7 @@ GenericMatrix read_from_netcdf(const std::string filename,
   //std::cout << std::endl;
 
   // read values for output
-  GenericMatrix output_matrix(N_rows, N_cols);
+  DeviceMatrix<Scalar> output_matrix(N_rows, N_cols);
 #if defined(USE_GPU)
   // if we want to use the GPU, we first need to read the matrix to the
   // host and copy it over to the device

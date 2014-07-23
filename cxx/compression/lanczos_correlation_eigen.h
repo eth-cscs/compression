@@ -13,7 +13,7 @@
 
 
 template <typename Scalar>
-bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const Scalar tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize = false)
+bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, const Scalar tol, const int max_iter, DeviceMatrix<Scalar> &EV, bool reorthogonalize = false)
 {
   int N = Xtranslated.rows();
   Scalar gamma, delta;
@@ -24,18 +24,18 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
   assert(EV.cols() == ne);
   assert(N         >= max_iter);
 
-  GenericMatrix V(N,max_iter);  // transformation
+  DeviceMatrix<Scalar> V(N,max_iter);  // transformation
 
-  GenericVector w(N);
+  DeviceVector<Scalar> w(N);
 
   // preallocate storage vectors
-  GenericVector r(N);   // residual, temporary
-  GenericVector tmp_vector(N);   // temporary
+  DeviceVector<Scalar> r(N);   // residual, temporary
+  DeviceVector<Scalar> tmp_vector(N);   // temporary
 
   //V.col(0).setOnes();     // Simple initial vector; no apparent side effects
   V.col(0).setRandom();     // Random initial vector, all nodes must generate same vector so use srand(RANDOM_SEED) in caller
   V.col(0) /= V.col(0).norm();    // Unit vector
-  GenericMatrix Trid = GenericMatrix::Zero(max_iter,max_iter);  // Tridiagonal
+  DeviceMatrix<Scalar> Trid = DeviceMatrix<Scalar>::Zero(max_iter,max_iter);  // Tridiagonal
   if (Xtranslated.cols() > 0) {
     tmp_vector = Xtranslated*(Xtranslated.transpose()*V.col(0));  // order important! evaluate right to left to save calculation!
   } else {
@@ -90,10 +90,10 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
     Trid(j, j) = delta;
     if ( j >= ne ) {
       // find eigenvectors/eigenvalues for the reduced triangular system
-      Eigen::SelfAdjointEigenSolver<GenericMatrix> eigensolver(Trid.block(0,0,j+1,j+1));
+      Eigen::SelfAdjointEigenSolver<DeviceMatrix<Scalar>> eigensolver(Trid.block(0,0,j+1,j+1));
       if (eigensolver.info() != Eigen::Success) abort();
-      GenericVector  eigs = eigensolver.eigenvalues().block(j+1-ne,0,ne,1);  // ne largest Ritz values, sorted ascending
-      GenericMatrix UT = eigensolver.eigenvectors();   // Ritz vectors
+      DeviceVector<Scalar>  eigs = eigensolver.eigenvalues().block(j+1-ne,0,ne,1);  // ne largest Ritz values, sorted ascending
+      DeviceMatrix<Scalar> UT = eigensolver.eigenvectors();   // Ritz vectors
       // std::cout << "iteration : " << j << ", Tblock : " << Trid.block(0,0,j+1,j+1) << std::endl;
       // std::cout << "iteration : " << j << ", ritz values " << eigs << std::endl;
       // std::cout << "iteration : " << j << ", ritz vectors " << UT << std::endl;
