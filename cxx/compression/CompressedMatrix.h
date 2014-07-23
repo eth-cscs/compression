@@ -1,4 +1,5 @@
 #include "matrices.h"
+#include "mpi_type_helper.h"
 
 #if defined(USE_EIGEN)
 #include "lanczos_correlation_eigen.h"
@@ -131,7 +132,7 @@ private:
           GET_COLUMN(X_translated, m) = GET_COLUMN(X, nonzeros[m])
               - GET_COLUMN(cluster_means_, k);
         }
-        bool success = lanczos_correlation(X_translated, 1, 1.0e-11, 50, TT[k], true);
+        bool success = lanczos_correlation(X_translated, 1, (Scalar) 1.0e-11, 50, TT[k], true);
       }
 
       // we calculate the L value here for output only
@@ -176,7 +177,7 @@ private:
         GET_COLUMN(X_translated, i) = GET_COLUMN(X, nonzeros[i])
             - GET_COLUMN(cluster_means_, k);
       }
-      lanczos_correlation(X_translated, M_, 1.0e-8, Nc_, eigenvectors_[k], true);
+      lanczos_correlation(X_translated, M_, (Scalar) 1.0e-8, Nc_, eigenvectors_[k], true);
     }
     Scalar L_value_final = L_norm(X, eigenvectors_);
     if (!my_rank_) std::cout << "L value final " << L_value_final << std::endl;
@@ -257,11 +258,11 @@ private:
     HostMatrix<Scalar> tmp_global(Nc_, K_);
     tmp_local = local_means;
     MPI_Allreduce(tmp_local.pointer(), tmp_global.pointer(), Nc_*K_,
-        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD);
     cluster_means_ = tmp_global;
 #else
     MPI_Allreduce(GET_POINTER(local_means), GET_POINTER(cluster_means_), Nc_*K_,
-        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD);
 #endif
   }
 
@@ -301,8 +302,8 @@ private:
       local_norm += colnorm * colnorm;
     }
     Scalar global_norm = 0.0;
-    MPI_Allreduce(&local_norm, &global_norm, 1, MPI_DOUBLE, MPI_SUM, 
-        MPI_COMM_WORLD);
+    MPI_Allreduce(&local_norm, &global_norm, 1, mpi_type_helper<Scalar>::value,
+        MPI_SUM, MPI_COMM_WORLD);
     return global_norm;
   }
 
@@ -327,7 +328,7 @@ private:
       X_translated -= TT[k] * (TT[k].transpose() * X_translated);
 #elif defined(USE_MINLIN)
       tmp_Nd(all) = transpose(X_translated) * TT[k];
-      geru_wrapper(X_translated, TT[k].pointer(), tmp_Nd.pointer(), -1.);
+      geru_wrapper(X_translated, TT[k].pointer(), tmp_Nd.pointer(), (Scalar) -1.);
 #endif
 
       for(int i=0; i<Nd_; i++) {

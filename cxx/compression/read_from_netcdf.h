@@ -22,6 +22,19 @@
      /* Handle errors by printing an error message and exiting with a
       * non-zero status. */
 
+int nc_get_varm(int ncid, int varid, size_t start[], size_t
+    count[], ptrdiff_t stride[], ptrdiff_t imap[], double *dp) {
+  int retval = nc_get_varm_double(ncid, varid, start, count, stride,
+      imap, dp);
+  return retval;
+}
+int nc_get_varm(int ncid, int varid, size_t start[], size_t
+    count[], ptrdiff_t stride[], ptrdiff_t imap[], float *fp) {
+  int retval = nc_get_varm_float(ncid, varid, start, count, stride,
+      imap, fp);
+  return retval;
+}
+
 template <typename Scalar>
 DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
                                const std::string variable,
@@ -171,11 +184,11 @@ DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
   // if we want to use the GPU, we first need to read the matrix to the
   // host and copy it over to the device
   HostMatrix<Scalar> temp_matrix(N_rows, N_cols);
-  if ((retval = nc_get_varm_double(netcdf_id, variable_id, start, count, NULL,
+  if ((retval = nc_get_varm(netcdf_id, variable_id, start, count, NULL,
           imap, temp_matrix.pointer()))) ERR(retval);
   output_matrix = temp_matrix;
 #else
-  if ((retval = nc_get_varm_double(netcdf_id, variable_id, start, count, NULL,
+  if ((retval = nc_get_varm(netcdf_id, variable_id, start, count, NULL,
           imap, GET_POINTER(output_matrix)))) ERR(retval);
 #endif
 

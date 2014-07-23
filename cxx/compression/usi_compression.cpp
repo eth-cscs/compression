@@ -23,6 +23,7 @@ typedef double Scalar;     // feel free to change this to 'double' if supported 
 #include "matrices.h"
 #include "read_from_netcdf.h"
 #include "CompressedMatrix.h"
+#include "mpi_type_helper.h"
 
 
 /**
@@ -188,7 +189,7 @@ int main(int argc, char *argv[])
     column_norm = GET_NORM(GET_COLUMN(X_difference, i));
     local_square_norm += column_norm * column_norm;
   }
-  MPI_Allreduce( &local_square_norm, &global_square_norm, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+  MPI_Allreduce( &local_square_norm, &global_square_norm, 1, mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD );
 
 
   //
@@ -199,8 +200,8 @@ int main(int argc, char *argv[])
   double time_for_input = time_after_reading_data - time_at_start;
   
   double max_time_for_solve, max_time_for_input;
-  MPI_Allreduce( &time_for_solve, &max_time_for_solve, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
-  MPI_Allreduce( &time_for_input, &max_time_for_input, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD );
+  MPI_Allreduce( &time_for_solve, &max_time_for_solve, 1, mpi_type_helper<Scalar>::value, MPI_MAX, MPI_COMM_WORLD );
+  MPI_Allreduce( &time_for_input, &max_time_for_input, 1, mpi_type_helper<Scalar>::value, MPI_MAX, MPI_COMM_WORLD );
 
   if (!my_rank) std::cout << "Max time for input " << max_time_for_input << std::endl;
   if (!my_rank) std::cout << "Max time for solve " << max_time_for_solve << std::endl;

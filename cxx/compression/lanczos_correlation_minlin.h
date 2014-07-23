@@ -1,5 +1,6 @@
 #pragma once
 #include <mkl.h>
+#include "mpi_type_helper.h"
 
 /**
 	   This template performs the Lanczos algorithm on a correlation
@@ -125,10 +126,10 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
   HostVector<Scalar> tmp_global(N);
   tmp_local = tmp_vector;
   MPI_Allreduce(tmp_local.pointer(), tmp_global.pointer(), N,
-      MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD);
   w = tmp_global;
 #else
-  MPI_Allreduce( tmp_vector.pointer(), w.pointer(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+  MPI_Allreduce( tmp_vector.pointer(), w.pointer(), N, mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD );
 #endif
   delta = dot(w, V(all,0));
   Trid(0,0) = delta;  // store in tridiagonal matrix
@@ -170,10 +171,10 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
 #if defined(USE_GPU)
     tmp_local = r;
     MPI_Allreduce(tmp_local.pointer(), tmp_global.pointer(), N,
-        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD);
     w = tmp_global;
 #else
-    MPI_Allreduce( GET_POINTER(r), GET_POINTER(w), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+    MPI_Allreduce( GET_POINTER(r), GET_POINTER(w), N, mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD );
 #endif
 
     // update diagonal of tridiagonal system
@@ -230,10 +231,10 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
 #if defined(USE_GPU)
         tmp_local = tmp_vector;
         MPI_Allreduce(tmp_local.pointer(), tmp_global.pointer(), N,
-            MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+            mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD);
         r = tmp_global;
 #else
-        MPI_Allreduce( GET_POINTER(tmp_vector), GET_POINTER(r), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+        MPI_Allreduce( GET_POINTER(tmp_vector), GET_POINTER(r), N, mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD );
 #endif
         // compute the relative error from the residual
         r -= GET_COLUMN(EV,count) * this_eig;   //residual

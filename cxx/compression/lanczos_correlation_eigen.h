@@ -1,3 +1,4 @@
+#include "mpi_type_helper.h"
 /**
 	   This template performs the Lanczos algorithm on a correlation
 	   matrix defined through the "Xtranslated" set of observations.
@@ -43,7 +44,7 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
     // do not attempt to participate in the calculation
     tmp_vector.setZero();
   }
-  MPI_Allreduce( tmp_vector.data(), w.data(), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+  MPI_Allreduce( tmp_vector.data(), w.data(), N, mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD );
   delta = w.transpose() * V.col(0);
 
   Trid(0,0) = delta;  // store in tridiagonal matrix
@@ -83,7 +84,7 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
       // do not attempt to participate in the calculation
       r.setZero();
     }
-    MPI_Allreduce( GET_POINTER(r), GET_POINTER(w), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+    MPI_Allreduce( GET_POINTER(r), GET_POINTER(w), N, mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD );
 
     // update diagonal of tridiagonal system
     delta = DOT_PRODUCT( w, GET_COLUMN(V,j) );
@@ -125,7 +126,7 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
         // find the residual
         // r = Xtranslated*( Xtranslated.transpose() * EV.col(count) ) - this_eig*EV.col(count);
         // Global summation or matrix product
-        MPI_Allreduce( GET_POINTER(tmp_vector), GET_POINTER(r), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+        MPI_Allreduce( GET_POINTER(tmp_vector), GET_POINTER(r), N, mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD );
         // compute the relative error from the residual
         r -= GET_COLUMN(EV,count) * this_eig;   //residual
         Scalar this_err = std::abs( NORM(r) / this_eig );

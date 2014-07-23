@@ -35,25 +35,51 @@ MINLIN_INIT
 #include <cublas_v2.h>
 #endif
 
-// double precision geru (rank-1 update)
+
+#if defined(USE_GPU)
+cublasStatus_t cublasTger(cublasHandle_t handle, int m, int n,
+    const double *alpha, const double *x, int incx, const double *y, int incy,
+    double *A, int lda) {
+  cublasStatus_t status = cublasDger(handle, m, n, alpha, x, incx, y, incy,
+      A, lda);
+  return status;
+}
+cublasStatus_t cublasTger(cublasHandle_t handle, int m, int n,
+    const float *alpha, const float *x, int incx, const float *y, int incy,
+    float *A, int lda) {
+  cublasStatus_t status = cublasSger(handle, m, n, alpha, x, incx, y, incy,
+      A, lda);
+  return status;
+}
+#else
+void tger(const int *m, const int *n, double *alpha, const double *x, const
+    int *incx, const double *y, const int *incy, double *A, const int *lda) {
+  dger(m, n, alpha, x, incx, y, incy, A, lda);
+}
+void tger(const int *m, const int *n, float *alpha, const float *x, const
+    int *incx, const float *y, const int *incy, float *A, const int *lda) {
+  sger(m, n, alpha, x, incx, y, incy, A, lda);
+}
+#endif
+
+// geru (rank-1 update)
 // A <- A - alpha*x*y'
 template<typename Scalar>
-bool geru_wrapper( DeviceMatrix<Scalar> &A, const double* x, const double* y, 
-    double alpha )
+bool geru_wrapper( DeviceMatrix<Scalar> &A, const Scalar* x, const Scalar* y,
+    Scalar alpha)
 {
   const int inc = 1;
 #ifdef USE_GPU
   cublasHandle_t handle = CublasState::instance()->handle();
-  cublasStatus_t status = cublasDger(handle, A.rows(), A.cols(), &alpha,
+  cublasStatus_t status = cublasTger(handle, A.rows(), A.cols(), &alpha,
       x, inc, y, inc, A.pointer(), A.rows());
   return (status==CUBLAS_STATUS_SUCCESS);
 #else
   const int m = A.rows();
   const int n = A.cols();
   const int lda = m;
-  dger(&m, &n, &alpha, const_cast<double*>(x), &inc, 
-      const_cast<double*>(y), &inc,  A.pointer(), &lda);
-
+  tger(&m, &n, &alpha, const_cast<Scalar*>(x), &inc,
+      const_cast<Scalar*>(y), &inc,  A.pointer(), &lda);
   return true;
 #endif
 }
