@@ -22,6 +22,7 @@
 
 # NetCDF files
 *.nc4
+*.nc
 
 # Compiled Project Files
 usi_compression_eigen
