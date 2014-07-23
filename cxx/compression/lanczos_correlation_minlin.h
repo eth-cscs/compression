@@ -1,3 +1,6 @@
+#pragma once
+#include <mkl.h>
+
 /**
 	   This template performs the Lanczos algorithm on a correlation
 	   matrix defined through the "Xtranslated" set of observations.
@@ -16,11 +19,76 @@
 	 */
 
 
-template <typename ScalarType>
-bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize)
+lapack_int steqr(lapack_int n, float* d, float* e, float* z, float* work) {
+    int info;
+    char compz = 'I';
+    ssteqr(&compz, &n, d, e, z, &n, work, &info);
+    return info;
+}
+lapack_int steqr(lapack_int n, double* d, double* e, double* z, double* work) {
+    int info;
+    char compz = 'I';
+    dsteqr(&compz, &n, d, e, z, &n, work, &info);
+    return info;
+}
+
+template <typename Scalar>
+bool steigs
+    (
+        Scalar *T,    // nxn input matrix T
+        Scalar *V,    // nxn output matrix for eigenvectors
+        Scalar *eigs, // output for eigenvalues
+        const int n,
+        int num_eigs=-1
+    )
+{
+    num_eigs = num_eigs<0 ? n : num_eigs;
+    num_eigs = num_eigs>n ? n : num_eigs;
+
+    // allocate memory for arrays used by LAPACK
+    Scalar *e = new Scalar[n-1];   // superdiagonal
+    Scalar *z = new Scalar[n*n];   // eigenvectors returned by LAPACK
+    Scalar *d = new Scalar[n];       // diagonal, used by ?steqr for storing eigenvalues
+    Scalar *work = new Scalar[2*n];  // working array for LAPACK
+
+    // pack the diagonal and super diagonal of T
+    int pos=0;
+    for(int i=0; i<n-1; i++) {
+        d[i] = T[pos];       // diagonal at T(i,i)
+        e[i] = T[pos+1];     // off diagonal at T(i,i+1)
+        pos += (n+1);
+    }
+    d[n-1] = T[pos];
+
+    // compute eigenvalues
+    lapack_int result = steqr(n, d, e, z, work);
+    if(result)
+        return false;
+
+    // copy the eigenvalues/-vectors to the output arrays
+    // and reverse the order as ?steqr returns them in 
+    // ascending order
+    for(int i=0; i<num_eigs; i++) {
+        Scalar* ptr_to   = V + i*n;
+        Scalar* ptr_from = z + (n-i-1)*n;
+        std::copy(ptr_from,  ptr_from+n,  ptr_to);
+        std::copy(d + (n-i-1), d + (n-i), eigs + i);
+    }
+
+    // free working arrays
+    delete[] e;
+    delete[] z;
+    delete[] d;
+    delete[] work;
+
+    return true;
+}
+
+template <typename Scalar>
+bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const Scalar tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize = false)
 {
   int N = Xtranslated.rows(); // this corresponds to Ntl in usi_compression.cpp
-  ScalarType gamma, delta;
+  Scalar gamma, delta;
 
   // check that output matrix has correct dimensions
   assert(EV.rows() == N);
@@ -29,9 +97,9 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
 
   // set up matrices for Arnoldi decomposition
   GenericMatrix V(N,max_iter);  // transformation
-  V(all,0) = ScalarType(1.); //TODO: make this a random vector
+  V(all,0) = Scalar(1.); //TODO: make this a random vector
   V(all,0) /= norm(V(all,0));    // Unit vector
-  HostMatrix<ScalarType> Trid(max_iter,max_iter);  // Tridiagonal
+  HostMatrix<Scalar> Trid(max_iter,max_iter);  // Tridiagonal
   Trid(all) = 0.;                            // Matrix must be zeroed out
   
   // preallocate storage vectors
@@ -53,8 +121,8 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
     tmp_vector(all) = 0;
   }
 #if defined(USE_GPU)
-  HostVector<ScalarType> tmp_local(N);
-  HostVector<ScalarType> tmp_global(N);
+  HostVector<Scalar> tmp_local(N);
+  HostVector<Scalar> tmp_global(N);
   tmp_local = tmp_vector;
   MPI_Allreduce(tmp_local.pointer(), tmp_global.pointer(), N,
       MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -79,7 +147,7 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
     // reorthogonalize
     if( reorthogonalize ) {
       for( int jj = 0; jj < j; ++jj )  {
-        ScalarType alpha =  DOT_PRODUCT( GET_COLUMN(V,jj), GET_COLUMN(V,j) ) ;
+        Scalar alpha =  DOT_PRODUCT( GET_COLUMN(V,jj), GET_COLUMN(V,j) ) ;
         GET_COLUMN(V,j) -= alpha * GET_COLUMN(V,jj);
       }
     }
@@ -118,10 +186,10 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
     if ( j >= ne ) {
 
       // find eigenvectors/eigenvalues for the reduced triangular system
-      HostVector<ScalarType> eigs(ne);
+      HostVector<Scalar> eigs(ne);
       
-      HostMatrix<ScalarType> Tsub = Trid(0,j,0,j);
-      HostMatrix<ScalarType> UVhost(j+1,ne);
+      HostMatrix<Scalar> Tsub = Trid(0,j,0,j);
+      HostMatrix<Scalar> UVhost(j+1,ne);
 
       // we calculate the eigenvalues with a MKL routine as minlin doesn't
       // have an eigensolver
@@ -141,9 +209,9 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
       ////////////////////////////////////////////////////////////////////
 
       // check whether we have converged to the tolerated error
-      ScalarType max_err = 0.;
+      Scalar max_err = 0.;
       for(int count=0; count<ne && !converged; count++){
-        ScalarType this_eig = eigs(count);
+        Scalar this_eig = eigs(count);
         
         if (Xtranslated.cols() > 0) {
           // we have to do this in two separate operations, otherwise we cannot
@@ -169,7 +237,7 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
 #endif
         // compute the relative error from the residual
         r -= GET_COLUMN(EV,count) * this_eig;   //residual
-        ScalarType this_err = std::abs( NORM(r) / this_eig );
+        Scalar this_err = std::abs( NORM(r) / this_eig );
         max_err = std::max(max_err, this_err);
         // terminate early if the current error exceeds the tolerance
         // std::cout << "iteration : " << j << " count " << count << ", this_eig : " << this_eig << "max_err" << max_err << std::endl;

@@ -65,13 +65,13 @@ GenericMatrix read_from_netcdf(const std::string filename,
   assert(n_dimensions == compressed_dimensions.size() + distributed_dimensions.size());
 
   // get IDs of dimensions used for the variable
-  int* dimension_ids = new int[sizeof(int)*n_dimensions];
+  int* dimension_ids = new int[n_dimensions];
   if ((retval = nc_inq_vardimid(netcdf_id, variable_id, dimension_ids))) ERR(retval);
 
   // set up arrays used as arguments for reading the data
-  size_t* start = new size_t[sizeof(size_t)*n_dimensions];
-  size_t* count = new size_t[sizeof(size_t)*n_dimensions];
-  ptrdiff_t* imap = new ptrdiff_t[sizeof(ptrdiff_t)*n_dimensions];
+  size_t* start = new size_t[n_dimensions];
+  size_t* count = new size_t[n_dimensions];
+  ptrdiff_t* imap = new ptrdiff_t[n_dimensions];
 
   // the inter-element distance is needed for building up the 'imap' vector
   int interelement_distance = 1;

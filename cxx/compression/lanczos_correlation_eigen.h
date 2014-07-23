@@ -12,11 +12,11 @@
 	 */
 
 
-template <typename ScalarType>
-bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const ScalarType tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize)
+template <typename Scalar>
+bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const Scalar tol, const int max_iter, GenericMatrix &EV, bool reorthogonalize = false)
 {
   int N = Xtranslated.rows();
-  ScalarType gamma, delta;
+  Scalar gamma, delta;
   bool converged = false;
 
   // check that output matrix has correct dimensions
@@ -48,7 +48,7 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
 
   Trid(0,0) = delta;  // store in tridiagonal matrix
 
-  ScalarType convergence_error;
+  Scalar convergence_error;
   int iter;
 
   // main loop, will terminate earlier if tolerance is reached
@@ -64,8 +64,8 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
     // reorthogonalize
     if( reorthogonalize ) {
       for( int jj = 0; jj < j; ++jj )  {
-        // ScalarType alpha =  V.col(jj).transpose() * V.col(j) ;
-        ScalarType alpha =  DOT_PRODUCT( GET_COLUMN(V,jj), GET_COLUMN(V,j) ) ;
+        // Scalar alpha =  V.col(jj).transpose() * V.col(j) ;
+        Scalar alpha =  DOT_PRODUCT( GET_COLUMN(V,jj), GET_COLUMN(V,j) ) ;
         GET_COLUMN(V,j) -= alpha * GET_COLUMN(V,jj);
       }
     }
@@ -90,8 +90,6 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
     Trid(j, j) = delta;
     if ( j >= ne ) {
       // find eigenvectors/eigenvalues for the reduced triangular system
-
-#if defined( EIGEN_EIGENSOLVE )
       Eigen::SelfAdjointEigenSolver<GenericMatrix> eigensolver(Trid.block(0,0,j+1,j+1));
       if (eigensolver.info() != Eigen::Success) abort();
       GenericVector  eigs = eigensolver.eigenvalues().block(j+1-ne,0,ne,1);  // ne largest Ritz values, sorted ascending
@@ -101,15 +99,6 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
       // std::cout << "iteration : " << j << ", ritz vectors " << UT << std::endl;
       // j or j+1 ??
       EV = V.block(0,0,N,j+1)*UT.block(0,j+1-ne,j+1,ne);  // Eigenvector approximations for largest ne eigenvalues
-#else
-      GenericMatrix Tsub = Trid.block(0,0,j+1,j+1);
-      GenericMatrix UT(j+1,ne);
-      GenericVector  eigs(j+1);
-      // TODO:  ensure that eigenvalues have ascending order
-      assert( steigs( Tsub.data(), UT.data(), eigs.data(), j+1, ne) );
-      EV = V.block(0,0,N,j+1)*UT.block(0,0,j+1,ne);
-#endif
-
 
       // copy eigenvectors for reduced system to the device
       ////////////////////////////////////////////////////////////////////
@@ -119,11 +108,11 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
       //
       ////////////////////////////////////////////////////////////////////
 
-      ScalarType max_err = 0.;
+      Scalar max_err = 0.;
 
       // TODO: sadly Eigen only returns these in ascending order; fix this
       for(int count=ne-1; count>=0 && !converged; count--){
-        ScalarType this_eig = eigs(count);
+        Scalar this_eig = eigs(count);
         // std::cout << "iteration : " << j << ", this_eig : " << this_eig << std::endl;
         if (Xtranslated.cols() > 0) {
           tmp_vector = Xtranslated*( Xtranslated.transpose() * EV.col(count) );  // TODO: MINLIN
@@ -139,7 +128,7 @@ bool lanczos_correlation(const GenericMatrix &Xtranslated, const int ne, const S
         MPI_Allreduce( GET_POINTER(tmp_vector), GET_POINTER(r), N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
         // compute the relative error from the residual
         r -= GET_COLUMN(EV,count) * this_eig;   //residual
-        ScalarType this_err = std::abs( NORM(r) / this_eig );
+        Scalar this_err = std::abs( NORM(r) / this_eig );
         max_err = std::max(max_err, this_err);
         // terminate early if the current error exceeds the tolerance
         // std::cout << "iteration : " << j << " count " << count << ", this_eig : " << this_eig << "max_err" << max_err << std::endl;

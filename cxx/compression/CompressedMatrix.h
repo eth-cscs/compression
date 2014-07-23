@@ -1,5 +1,10 @@
 #include "matrices.h"
-#include "lanczos_correlation.h"
+
+#if defined(USE_EIGEN)
+#include "lanczos_correlation_eigen.h"
+#elif defined(USE_MINLIN)
+#include "lanczos_correlation_minlin.h"
+#endif
 
 template<class Scalar>
 class CompressedMatrix
@@ -67,7 +72,7 @@ private:
     // collect number of columns each process has
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_processes_);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank_);
-    int *Nd_global = new int[sizeof(int)*mpi_processes_];
+    int *Nd_global = new int[mpi_processes_];
     MPI_Allgather( &Nd_, 1, MPI_INT, Nd_global, 1, MPI_INT,
         MPI_COMM_WORLD);
     Nd_total_ = 0;
@@ -87,6 +92,8 @@ private:
     // set up sizes
     original_size = Nc_ * Nd_total_;
     compressed_size = (K_ * (M_ + 1) * (Nc_ + Nd_total_));
+
+    delete[] Nd_global;
 
   }
 
@@ -228,7 +235,7 @@ private:
       
       if (sum_gamma > 0) {
 #if defined( USE_EIGEN )
-        local_means.col(k) =  Eigen::MatrixXd::Zero(Ntl, 1);
+        local_means.col(k) =  Eigen::MatrixXd::Zero(Nc_, 1);
         for (int i = 0; i < nonzeros.size(); i++ ) {
           local_means.col(k) += X.col(nonzeros[i]);  
         }
