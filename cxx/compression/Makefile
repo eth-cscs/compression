@@ -24,7 +24,7 @@ minlin_host: usi_compression.cpp
 	CC usi_compression.cpp -o usi_compression_minlin_host -fopenmp -O3 $(INCLUDE) $(MINLIN_INCLUDE) $(LIBS) $(MINLIN_ARGS)
 
 minlin_device: usi_compression.cpp
-	nvcc -c usi_compression.cu --compiler-options "-fopenmp -O3 -Wno-vla $(NVCC_INCLUDE)" $(INCLUDE) $(MINLIN_INCLUDE) $(LIBS) $(MINLIN_DEVICE_ARGS)
+	nvcc -c usi_compression.cu -arch=sm_35 --compiler-options "-fopenmp -O3 -Wno-vla $(NVCC_INCLUDE)" $(INCLUDE) $(MINLIN_INCLUDE) $(LIBS) $(MINLIN_DEVICE_ARGS)
 	CC usi_compression.o -o usi_compression_minlin_device -fopenmp $(LIBS) -lcublas -g
 	rm -f usi_compression.o
 
