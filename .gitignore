@@ -25,9 +25,8 @@
 *.nc
 
 # Compiled Project Files
-usi_compression_eigen
-usi_compression_minlin_host
-usi_compression_minlin_device
+build/
+build-dbg/
 
 # Vim Swap Files
 *.swp
