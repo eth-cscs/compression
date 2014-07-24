@@ -85,5 +85,5 @@ bool geru_wrapper( DeviceMatrix<Scalar> &A, const Scalar* x, const Scalar* y,
 }
 
 #else
-ERROR!   MUST USE A LIBRARY, E.G. USE_EIGEN OR USE_MINLIN
+#error "ERROR! MUST USE A LIBRARY, E.G. USE_EIGEN OR USE_MINLIN"
 #endif
