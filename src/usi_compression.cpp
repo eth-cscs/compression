@@ -121,13 +121,13 @@ int main(int argc, char *argv[])
     ("help", "display this help message")
     ("version", "display the version number")
     ("compressed,c", po::value< std::vector<std::string> >(&compressed_dims)
-        ->default_value(default_compressed_dims, "lon,lat"), 
+        ->default_value(default_compressed_dims, "lon,lat")->multitoken(), 
         "list of compressed dimensions")
     ("distributed,d", po::value< std::vector<std::string> >(&distributed_dims)
-        ->default_value(default_distributed_dims, "mlev,time"), 
+        ->default_value(default_distributed_dims, "mlev,time")->multitoken(), 
         "list of distributed dimensions")
     ("indexed,i", po::value< std::vector<std::string> >(&indexed_dims)
-        ->default_value(std::vector<std::string>(0), "none"),
+        ->default_value(std::vector<std::string>(0), "none")->multitoken(),
         "list of indexed dimensions")
     ("clusters,K", po::value<int>(&K_size)->default_value(KSIZE),
         "the number of clusters used for PCA (K)")
