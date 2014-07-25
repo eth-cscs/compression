@@ -6,7 +6,6 @@
 #define GET_POINTER( VARIABLE )            VARIABLE.data()
 #define GET_NORM( VARIABLE )               VARIABLE.norm()
 #define DOT_PRODUCT( VECTOR1, VECTOR2 )    VECTOR1.transpose() * VECTOR2
-#define NORM( VECTOR )                     VECTOR.norm()
 #include <Eigen/Dense>
 
 template<class Scalar> using HostMatrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
@@ -22,16 +21,22 @@ template<class Scalar> using DeviceVector = Eigen::Matrix<Scalar, Eigen::Dynamic
 
 #define GET_COLUMN( VARIABLE, COLUMN_NR )  VARIABLE(all,COLUMN_NR)
 #define GET_POINTER( VARIABLE )            VARIABLE.pointer()
-#define GET_NORM( VARIABLE )               norm( VARIABLE )
-#define DOT_PRODUCT( VECTOR1, VECTOR2 )    dot( VECTOR1, VECTOR2 )
-#define NORM( VECTOR )                     norm(VECTOR)
+#define GET_NORM( VARIABLE )               minlin::norm( VARIABLE )
+#define DOT_PRODUCT( VECTOR1, VECTOR2 )    minlin::dot( VECTOR1, VECTOR2 )
 
 #include <minlin/minlin.h>
 #include <minlin/modules/threx/threx.h>
-using namespace minlin::threx; // just dump the namespace for this example
+using minlin::threx::HostMatrix;
+using minlin::threx::DeviceMatrix;
+using minlin::threx::HostVector;
+using minlin::threx::DeviceVector;
 
 #if THRUST_DEVICE_SYSTEM != THRUST_DEVICE_SYSTEM_OMP
+namespace minlin {
+namespace threx {
 MINLIN_INIT
+}
+}
 #include <cublas_v2.h>
 #endif
 
@@ -70,7 +75,7 @@ bool geru_wrapper( DeviceMatrix<Scalar> &A, const Scalar* x, const Scalar* y,
 {
   const int inc = 1;
 #ifdef USE_GPU
-  cublasHandle_t handle = CublasState::instance()->handle();
+  cublasHandle_t handle = minlin::threx::CublasState::instance()->handle();
   cublasStatus_t status = cublasTger(handle, A.rows(), A.cols(), &alpha,
       x, inc, y, inc, A.pointer(), A.rows());
   return (status==CUBLAS_STATUS_SUCCESS);

@@ -332,7 +332,7 @@ private:
 #endif
 
       for(int i=0; i<Nd_; i++) {
-        Scalar this_norm = NORM(GET_COLUMN(X_translated,i));
+        Scalar this_norm = GET_NORM(GET_COLUMN(X_translated,i));
         if(this_norm<smallest_norm[i]) {
           smallest_norm[i] = this_norm;
           cluster_indices_[i] = k;

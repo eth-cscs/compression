@@ -129,7 +129,7 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
         MPI_Allreduce( GET_POINTER(tmp_vector), GET_POINTER(r), N, mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD );
         // compute the relative error from the residual
         r -= GET_COLUMN(EV,count) * this_eig;   //residual
-        Scalar this_err = std::abs( NORM(r) / this_eig );
+        Scalar this_err = std::abs( GET_NORM(r) / this_eig );
         max_err = std::max(max_err, this_err);
         // terminate early if the current error exceeds the tolerance
         // std::cout << "iteration : " << j << " count " << count << ", this_eig : " << this_eig << "max_err" << max_err << std::endl;
