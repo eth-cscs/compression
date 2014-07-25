@@ -20,13 +20,13 @@
 	 */
 
 
-lapack_int steqr(lapack_int n, float* d, float* e, float* z, float* work) {
+lapack_int steqr(const lapack_int n, float* d, float* e, float* z, float* work) {
     int info;
     char compz = 'I';
     ssteqr(&compz, &n, d, e, z, &n, work, &info);
     return info;
 }
-lapack_int steqr(lapack_int n, double* d, double* e, double* z, double* work) {
+lapack_int steqr(const lapack_int n, double* d, double* e, double* z, double* work) {
     int info;
     char compz = 'I';
     dsteqr(&compz, &n, d, e, z, &n, work, &info);
@@ -36,7 +36,7 @@ lapack_int steqr(lapack_int n, double* d, double* e, double* z, double* work) {
 template <typename Scalar>
 bool steigs
     (
-        Scalar *T,    // nxn input matrix T
+        const Scalar *T,    // nxn input matrix T
         Scalar *V,    // nxn output matrix for eigenvectors
         Scalar *eigs, // output for eigenvalues
         const int n,
@@ -210,7 +210,7 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
       ////////////////////////////////////////////////////////////////////
 
       // check whether we have converged to the tolerated error
-      Scalar max_err = 0.;
+      Scalar max_err = 0.0;
       for(int count=0; count<ne && !converged; count++){
         Scalar this_eig = eigs(count);
         

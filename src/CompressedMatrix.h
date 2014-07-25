@@ -16,7 +16,7 @@ public:
   int original_size;
   int compressed_size;
 
-  CompressedMatrix(DeviceMatrix<Scalar> &X, const int K, const int M) {
+  CompressedMatrix(const DeviceMatrix<Scalar> &X, const int K, const int M) {
 
     Nc_ = X.rows(); // number of entries along compressed direction
     Nd_ = X.cols(); // number of entries along distributed direction
@@ -98,7 +98,7 @@ private:
 
   }
 
-  void do_iterative_clustering(DeviceMatrix<Scalar> &X) {
+  void do_iterative_clustering(const DeviceMatrix<Scalar> &X) {
 
     // eigenvectors: 1 for each k
     std::vector< DeviceMatrix<Scalar> > TT(K_, DeviceMatrix<Scalar>(Nc_, 1));
@@ -164,7 +164,7 @@ private:
     }
   }
 
-  void do_final_pca(DeviceMatrix<Scalar> &X) {
+  void do_final_pca(const DeviceMatrix<Scalar> &X) {
 
     update_cluster_means(X);
     
@@ -183,7 +183,7 @@ private:
     if (!my_rank_) std::cout << "L value final " << L_value_final << std::endl;
   }
 
-  void calculate_reduced_form(DeviceMatrix<Scalar> &X) {
+  void calculate_reduced_form(const DeviceMatrix<Scalar> &X) {
 
     // This loop can be multithreaded, if all threads have a separate
     // copy of X_translated
@@ -266,7 +266,7 @@ private:
 #endif
   }
 
-  Scalar L_norm(DeviceMatrix<Scalar> &X, std::vector< DeviceMatrix<Scalar> > &EOFs) {
+  Scalar L_norm(const DeviceMatrix<Scalar> &X, const std::vector< DeviceMatrix<Scalar> > &EOFs) {
 
     // This loop can be multithreaded, if all threads have a separate
     // copy of X_translated
@@ -328,7 +328,7 @@ private:
       X_translated -= TT[k] * (TT[k].transpose() * X_translated);
 #elif defined(USE_MINLIN)
       tmp_Nd(all) = transpose(X_translated) * TT[k];
-      geru_wrapper(X_translated, TT[k].pointer(), tmp_Nd.pointer(), (Scalar) -1.);
+      geru_wrapper(X_translated, TT[k].pointer(), tmp_Nd.pointer(), (Scalar) -1);
 #endif
 
       for(int i=0; i<Nd_; i++) {

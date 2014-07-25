@@ -109,7 +109,7 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
       //
       ////////////////////////////////////////////////////////////////////
 
-      Scalar max_err = 0.;
+      Scalar max_err = 0.0;
 
       // TODO: sadly Eigen only returns these in ascending order; fix this
       for(int count=ne-1; count>=0 && !converged; count--){

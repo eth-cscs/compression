@@ -57,11 +57,11 @@ cublasStatus_t cublasTger(cublasHandle_t handle, int m, int n,
   return status;
 }
 #else
-void tger(const int *m, const int *n, double *alpha, const double *x, const
+void tger(const int *m, const int *n, const double *alpha, const double *x, const
     int *incx, const double *y, const int *incy, double *A, const int *lda) {
   dger(m, n, alpha, x, incx, y, incy, A, lda);
 }
-void tger(const int *m, const int *n, float *alpha, const float *x, const
+void tger(const int *m, const int *n, const float *alpha, const float *x, const
     int *incx, const float *y, const int *incy, float *A, const int *lda) {
   sger(m, n, alpha, x, incx, y, incy, A, lda);
 }
@@ -70,7 +70,7 @@ void tger(const int *m, const int *n, float *alpha, const float *x, const
 // geru (rank-1 update)
 // A <- A - alpha*x*y'
 template<typename Scalar>
-bool geru_wrapper( DeviceMatrix<Scalar> &A, const Scalar* x, const Scalar* y,
+bool geru_wrapper(DeviceMatrix<Scalar> &A, const Scalar* x, const Scalar* y,
     Scalar alpha)
 {
   const int inc = 1;
@@ -83,8 +83,7 @@ bool geru_wrapper( DeviceMatrix<Scalar> &A, const Scalar* x, const Scalar* y,
   const int m = A.rows();
   const int n = A.cols();
   const int lda = m;
-  tger(&m, &n, &alpha, const_cast<Scalar*>(x), &inc,
-      const_cast<Scalar*>(y), &inc,  A.pointer(), &lda);
+  tger(&m, &n, &alpha, x, &inc, y, &inc,  A.pointer(), &lda);
   return true;
 #endif
 }
