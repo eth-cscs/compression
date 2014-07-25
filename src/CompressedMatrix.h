@@ -37,11 +37,11 @@ public:
     // This loop can be multithreaded, if all threads have a separate
     // copy of X_translated
     for(int k = 0; k < K_; k++) {
-      std::vector<int> nonzeros = find(cluster_indices_, k);
-      for (int m = 0; m < nonzeros.size() ; m++ ) {       
-        GET_COLUMN(X_reconstructed, nonzeros[m]) = eigenvectors_[k]
-            * GET_COLUMN(X_reduced_[k], nonzeros[m]);
-        GET_COLUMN(X_reconstructed, nonzeros[m]) += GET_COLUMN(cluster_means_, k);
+      std::vector<int> current_cluster_indices = indices_for_cluster(k);
+      for (int m = 0; m < current_cluster_indices.size() ; m++ ) {
+        GET_COLUMN(X_reconstructed, current_cluster_indices[m]) = eigenvectors_[k]
+            * GET_COLUMN(X_reduced_[k], current_cluster_indices[m]);
+        GET_COLUMN(X_reconstructed, current_cluster_indices[m]) += GET_COLUMN(cluster_means_, k);
       }
     }
 
@@ -125,11 +125,11 @@ private:
       
       // Principle Component Analysis for every cluster
       for(int k = 0; k < K_; k++) {
-        std::vector<int> nonzeros = find(cluster_indices_, k);
-        DeviceMatrix<Scalar> X_translated(Nc_, nonzeros.size()) ;
-        for (int m = 0; m < nonzeros.size() ; m++ ) {
+        std::vector<int> current_cluster_indices = indices_for_cluster(k);
+        DeviceMatrix<Scalar> X_translated(Nc_, current_cluster_indices.size()) ;
+        for (int m = 0; m < current_cluster_indices.size() ; m++ ) {
           // Translate X columns with mean value at new origin
-          GET_COLUMN(X_translated, m) = GET_COLUMN(X, nonzeros[m])
+          GET_COLUMN(X_translated, m) = GET_COLUMN(X, current_cluster_indices[m])
               - GET_COLUMN(cluster_means_, k);
         }
         bool success = lanczos_correlation(X_translated, 1, (Scalar) 1.0e-11, 50, TT[k], true);
@@ -170,11 +170,11 @@ private:
     
     // Principal Component Analysis for every cluster
     for(int k = 0; k < K_; k++) {
-      std::vector<int> nonzeros = find(cluster_indices_, k);
-      DeviceMatrix<Scalar> X_translated(Nc_, nonzeros.size());
-      for (int i = 0; i < nonzeros.size(); i++) {
+      std::vector<int> current_cluster_indices = indices_for_cluster(k);
+      DeviceMatrix<Scalar> X_translated(Nc_, current_cluster_indices.size());
+      for (int i = 0; i < current_cluster_indices.size(); i++) {
         // Translate X columns with mean value at new origin
-        GET_COLUMN(X_translated, i) = GET_COLUMN(X, nonzeros[i])
+        GET_COLUMN(X_translated, i) = GET_COLUMN(X, current_cluster_indices[i])
             - GET_COLUMN(cluster_means_, k);
       }
       lanczos_correlation(X_translated, M_, (Scalar) 1.0e-8, Nc_, eigenvectors_[k], true);
@@ -189,21 +189,21 @@ private:
     // copy of X_translated
     DeviceMatrix<Scalar> X_translated(Nc_, Nd_);
     for(int k = 0; k < K_; k++) {
-      std::vector<int> nonzeros = find(cluster_indices_, k);
+      std::vector<int> current_cluster_indices = indices_for_cluster(k);
 
       // Translate X columns with mean values and project them into subspace
       // spanned by eigenvectors
-      for (int i = 0; i < nonzeros.size(); i++ ) {
+      for (int i = 0; i < current_cluster_indices.size(); i++ ) {
 #if defined( USE_EIGEN )      
-        X_translated.col(nonzeros[i]) = X.col(nonzeros[i])
+        X_translated.col(current_cluster_indices[i]) = X.col(current_cluster_indices[i])
             - cluster_means_.col(k);
-        X_reduced_[k].col(nonzeros[i]) = eigenvectors_[k].transpose()
-            * X_translated.col(nonzeros[i]);
+        X_reduced_[k].col(current_cluster_indices[i]) = eigenvectors_[k].transpose()
+            * X_translated.col(current_cluster_indices[i]);
 #elif defined( USE_MINLIN )
-        X_translated(all, nonzeros[i]) = X(all, nonzeros[i])
+        X_translated(all, current_cluster_indices[i]) = X(all, current_cluster_indices[i])
             - cluster_means_(all,k);
-        X_reduced_[k](all, nonzeros[i]) = transpose(eigenvectors_[k])
-            * X_translated(all,nonzeros[i]);
+        X_reduced_[k](all, current_cluster_indices[i]) = transpose(eigenvectors_[k])
+            * X_translated(all,current_cluster_indices[i]);
 #endif
       }
     }
@@ -214,13 +214,13 @@ private:
 
     // This loop is parallel: No dependencies between the columns
     // (local_vector needs to be private)
-    std::vector<int> local_nbr_nonzeros(K_);
-    std::vector<int> global_nbr_nonzeros(K_);
+    std::vector<int> local_cluster_sizes(K_);
+    std::vector<int> global_cluster_sizes(K_);
     for(int k = 0; k < K_; k++) {
-      std::vector<int> nonzeros = find(cluster_indices_, k);
-      local_nbr_nonzeros[k] = nonzeros.size();
+      std::vector<int> current_cluster_indices = indices_for_cluster(k);
+      local_cluster_sizes[k] = current_cluster_indices.size();
     }   
-    MPI_Allreduce(local_nbr_nonzeros.data(), global_nbr_nonzeros.data(), K_, 
+    MPI_Allreduce(local_cluster_sizes.data(), global_cluster_sizes.data(), K_,
         MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
     // This loop is parallel: No dependencies between the columns
@@ -229,22 +229,22 @@ private:
     for(int k = 0; k < K_; k++) {
       
       // Could use a matrix for this to avoid 2nd load;
-      std::vector<int> nonzeros = find(cluster_indices_, k);   
+      std::vector<int> current_cluster_indices = indices_for_cluster(k);
       
       // Number of entries containing each index
-      Scalar sum_gamma = static_cast<Scalar> (global_nbr_nonzeros[k]);
+      Scalar sum_gamma = static_cast<Scalar> (global_cluster_sizes[k]);
       
       if (sum_gamma > 0) {
 #if defined( USE_EIGEN )
         local_means.col(k) =  Eigen::MatrixXd::Zero(Nc_, 1);
-        for (int i = 0; i < nonzeros.size(); i++ ) {
-          local_means.col(k) += X.col(nonzeros[i]);  
+        for (int i = 0; i < current_cluster_indices.size(); i++ ) {
+          local_means.col(k) += X.col(current_cluster_indices[i]);
         }
         local_means.col(k) /= sum_gamma;
 #elif defined( USE_MINLIN )
         local_means(all,k) =  0.;
-        for (int i = 0; i < nonzeros.size() ; i++ ) {
-          local_means(all,k) += X(all,nonzeros[i]);  
+        for (int i = 0; i < current_cluster_indices.size() ; i++ ) {
+          local_means(all,k) += X(all,current_cluster_indices[i]);
         }
         local_means(all,k) /= sum_gamma;
 #endif
@@ -276,20 +276,20 @@ private:
     DeviceVector<Scalar> tmp_Nc(Nc_);
 #endif
     for(int k = 0; k < K_; k++) {
-      std::vector<int> nonzeros = find(cluster_indices_, k);
+      std::vector<int> current_cluster_indices = indices_for_cluster(k);
 
       // Translate X columns with mean value and subtract projection
       // into subspace spanned by eigenvector(s)
-      for (int i = 0; i < nonzeros.size() ; i++ ) {
+      for (int i = 0; i < current_cluster_indices.size() ; i++ ) {
 #if defined( USE_EIGEN )      
-        X_translated.col(nonzeros[i])  = X.col(nonzeros[i]) - cluster_means_.col(k);
-        X_translated.col(nonzeros[i]) -=  EOFs[k] * (EOFs[k].transpose()
-            * X_translated.col(nonzeros[i]));
+        X_translated.col(current_cluster_indices[i])  = X.col(current_cluster_indices[i]) - cluster_means_.col(k);
+        X_translated.col(current_cluster_indices[i]) -=  EOFs[k] * (EOFs[k].transpose()
+            * X_translated.col(current_cluster_indices[i]));
 #elif defined( USE_MINLIN )
-        X_translated(all,nonzeros[i])  = X(all,nonzeros[i]) - cluster_means_(all,k);
-        tmp_K(all) = transpose(EOFs[k]) * X_translated(all,nonzeros[i]);
+        X_translated(all,current_cluster_indices[i])  = X(all,current_cluster_indices[i]) - cluster_means_(all,k);
+        tmp_K(all) = transpose(EOFs[k]) * X_translated(all,current_cluster_indices[i]);
         tmp_Nc(all) = EOFs[k] * tmp_K;
-        X_translated(all,nonzeros[i]) -= tmp_Nc;
+        X_translated(all,current_cluster_indices[i]) -= tmp_Nc;
 #endif
       }
     }
@@ -341,10 +341,10 @@ private:
     }
   }
 
-  std::vector<int> find(const std::vector<int> int_vector, const int k) {
+  std::vector<int> indices_for_cluster(const int k) {
     std::vector<int> found_items;
-    for (int i=0; i<int_vector.size(); i++) {
-      if (int_vector[i] == k) { found_items.push_back(i); }
+    for (int i=0; i<cluster_indices_.size(); i++) {
+      if (cluster_indices_[i] == k) { found_items.push_back(i); }
     }
     return found_items;
   }
