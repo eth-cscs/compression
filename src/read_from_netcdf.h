@@ -39,7 +39,8 @@ template <typename Scalar>
 DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
                                const std::string variable,
                                const std::vector<std::string> compressed_dimensions,
-                               const std::vector<std::string> distributed_dimensions)
+                               const std::vector<std::string> distributed_dimensions,
+                               const std::vector<std::string> indexed_dimensions)
 {
 
   // get MPI information
@@ -75,7 +76,8 @@ DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
   if ((retval = nc_inq_varid(netcdf_id, variable.c_str(), &variable_id))) ERR(retval);
   if ((retval = nc_inq_varndims(netcdf_id, variable_id, &n_dimensions))) ERR(retval);
   if (!my_rank) std::cout << "Number of dimensions: " << n_dimensions << std::endl;
-  assert(n_dimensions == compressed_dimensions.size() + distributed_dimensions.size());
+  assert(n_dimensions == compressed_dimensions.size()
+      + distributed_dimensions.size() + indexed_dimensions.size());
 
   // get IDs of dimensions used for the variable
   int* dimension_ids = new int[n_dimensions];
@@ -170,6 +172,46 @@ DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
   }
 
   int N_cols = interelement_distance / N_rows;
+
+  // INDEXED DIMENSIONS
+  // fill up entries in start, count, and imap
+  if (!my_rank) std::cout << "Indexed dimensions:" << std::endl;
+  for (int i = 0; i < indexed_dimensions.size(); i++) {
+
+    // split the string into dimension name and selected index
+    size_t separator_index = indexed_dimensions[i].find("=");
+    if (separator_index == std::string::npos) {
+      if (!my_rank) std::cout << "ERROR: Invalid separator for dimension "
+          << indexed_dimensions[i] << std::endl;
+      exit(1);
+    }
+    std::string dimension_name = indexed_dimensions[i].substr(0,separator_index);
+    int selected_index = std::atoi(indexed_dimensions[i].substr(separator_index+1).c_str());
+
+    // find out where in the variable dimensions the current dimension is located
+    // TODO: check if there is a better way for this
+    if ((retval = nc_inq_dimid(netcdf_id, dimension_name.c_str(), &dimension_id))) ERR(retval);
+    vardim_id = -1;
+    for (int j=0; j<n_dimensions; j++) {
+      if (dimension_ids[j] == dimension_id) {
+        vardim_id = j;
+        break;
+      }
+    }
+    assert(vardim_id >= 0); // make sure the dimension has been found
+
+    // get length of dimension
+    //size_t dim_length;
+    //if ((retval = nc_inq_dimlen(netcdf_id, dimension_id, &dim_length))) ERR(retval);
+    if (!my_rank) std::cout << "  dimension '" << dimension_name << "': index "
+        << selected_index << std::endl;
+
+    // write values into arrays
+    start[vardim_id] = selected_index;
+    count[vardim_id] = 1;
+    imap[vardim_id] = 1;
+
+  }
 
   // print which values are read by the current rank
   //std::cout << "Rank " << my_rank << " has data";

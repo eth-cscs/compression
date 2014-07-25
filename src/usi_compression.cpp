@@ -106,6 +106,7 @@ int main(int argc, char *argv[])
   std::string variable_name;
   std::vector<std::string> compressed_dims;
   std::vector<std::string> distributed_dims;
+  std::vector<std::string> indexed_dims;
 
   std::vector<std::string> default_compressed_dims;
   default_compressed_dims.push_back("lon");
@@ -125,6 +126,9 @@ int main(int argc, char *argv[])
     ("distributed,d", po::value< std::vector<std::string> >(&distributed_dims)
         ->default_value(default_distributed_dims, "mlev,time"), 
         "list of distributed dimensions")
+    ("indexed,i", po::value< std::vector<std::string> >(&indexed_dims)
+        ->default_value(std::vector<std::string>(0), "none"),
+        "list of indexed dimensions")
     ("clusters,K", po::value<int>(&K_size)->default_value(KSIZE),
         "the number of clusters used for PCA (K)")
     ("eigenvectors,M", po::value<int>(&M_size)->default_value(MSIZE),
@@ -161,7 +165,8 @@ int main(int argc, char *argv[])
   // Read NetCDF Data
   //
 
-  DeviceMatrix<Scalar> X = read_from_netcdf<Scalar>(filename, variable_name, compressed_dims, distributed_dims);
+  DeviceMatrix<Scalar> X = read_from_netcdf<Scalar>(filename, variable_name,
+      compressed_dims, distributed_dims, indexed_dims);
   
   double time_after_reading_data = MPI_Wtime();
 
