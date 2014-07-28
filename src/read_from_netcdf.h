@@ -49,7 +49,6 @@ template <typename Scalar>
 DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
                                const std::string variable,
                                const std::vector<std::string> compressed_dimensions,
-                               const std::vector<std::string> distributed_dimensions,
                                const std::vector<std::string> indexed_dimensions)
 {
 
@@ -66,11 +65,20 @@ DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
   //if ((retval = nc_open(filename.c_str(), NC_NOWRITE|NC_MPIIO, &netcdf_id))) ERR(retval); // sequential version
   if (!my_rank) std::cout << "Processing: " << filename.c_str() << " SEARCHING FOR " << variable.c_str() << std::endl;
 
+  // get number of dimensions for selected variable
+  int variable_id, n_dimensions;
+  if ((retval = nc_inq_varid(netcdf_id, variable.c_str(), &variable_id))) ERR(retval);
+  if ((retval = nc_inq_varndims(netcdf_id, variable_id, &n_dimensions))) ERR(retval);
+  if (!my_rank) std::cout << "Number of dimensions: " << n_dimensions << std::endl;
+  int n_distributed_dimensions = n_dimensions - compressed_dimensions.size()
+      - indexed_dimensions.size();
+  assert(n_distributed_dimensions > 0);
+
   // build list of number of processes along each distributed dimension
   // note: we assume mpi_processes to be a power of 2
   int p = mpi_processes;
   int i = 0;
-  std::vector<int> process_distribution(distributed_dimensions.size(), 1);
+  std::vector<int> process_distribution(n_distributed_dimensions, 1);
   while (p > 1) {
     if (p%2 != 0) {
       std::cout << "Error: The number of processes must be a power of 2" << std::endl;
@@ -81,21 +89,13 @@ DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
     i = (i+1)%process_distribution.size(); // restart at the beginning if end is reached
   }
 
-  // get number of dimensions for selected variable
-  int variable_id, n_dimensions;
-  if ((retval = nc_inq_varid(netcdf_id, variable.c_str(), &variable_id))) ERR(retval);
-  if ((retval = nc_inq_varndims(netcdf_id, variable_id, &n_dimensions))) ERR(retval);
-  if (!my_rank) std::cout << "Number of dimensions: " << n_dimensions << std::endl;
-  assert(n_dimensions == compressed_dimensions.size()
-      + distributed_dimensions.size() + indexed_dimensions.size());
-
   // get IDs of dimensions used for the variable
   int* dimension_ids = new int[n_dimensions];
   if ((retval = nc_inq_vardimid(netcdf_id, variable_id, dimension_ids))) ERR(retval);
 
   // set up arrays used as arguments for reading the data
   size_t* start = new size_t[n_dimensions];
-  size_t* count = new size_t[n_dimensions];
+  size_t* count = new size_t[n_dimensions](); // initialize to zero
   ptrdiff_t* imap = new ptrdiff_t[n_dimensions];
 
   // the inter-element distance is needed for building up the 'imap' vector
@@ -134,54 +134,6 @@ DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
   }
 
   int N_rows = interelement_distance;
-
-  // DISTRIBUTED DIMENSIONS
-  // fill up entries in start, count, and imap
-  int r = my_rank; // needed for calculating index along dimension
-  int d = mpi_processes; // needed for calculating index along dimension
-  if (!my_rank) std::cout << "Distributed dimensions:" << std::endl;
-  for (int i=0; i<distributed_dimensions.size(); i++) {
-
-    // find out where in the variable dimensions the current dimension is located
-    // TODO: check if there is a better way for this
-    if ((retval = nc_inq_dimid(netcdf_id, distributed_dimensions[i].c_str(), &dimension_id))) ERR(retval);
-    vardim_id = -1;
-    for (int j=0; j<n_dimensions; j++) {
-      if (dimension_ids[j] == dimension_id) {
-        vardim_id = j;
-        break;
-      }
-    }
-    assert(vardim_id >= 0); // make sure the dimension has been found
-
-    // get length of dimension
-    size_t dim_length;
-    if ((retval = nc_inq_dimlen(netcdf_id, dimension_id, &dim_length))) ERR(retval);
-    if (!my_rank) std::cout << "  dimension '" << distributed_dimensions[i] << "': length " 
-        << dim_length << " divided into " << process_distribution[i] << " parts" << std::endl;
-
-    // calculate index along dimension
-    // note: this is not immediately obvious, change with care!
-    d /= process_distribution[i];
-    int dim_index = r / d;
-    r %= d;
-
-    int size_along_dim = dim_length / process_distribution[i];
-
-    // write values into arrays
-    start[vardim_id] = dim_index * size_along_dim;
-    count[vardim_id] = size_along_dim;
-    if (dim_index == process_distribution[i] - 1) {
-      // if we are the last process along a dimension, add the remainder
-      count[vardim_id] += dim_length % process_distribution[i];
-    }
-    imap[vardim_id] = interelement_distance;
-
-    // the next variable has to change slower in the output array
-    interelement_distance *= count[vardim_id];
-  }
-
-  int N_cols = interelement_distance / N_rows;
 
   // INDEXED DIMENSIONS
   // fill up entries in start, count, and imap
@@ -222,6 +174,52 @@ DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
     imap[vardim_id] = 1;
 
   }
+
+  // DISTRIBUTED DIMENSIONS
+  // fill up entries in start, count, and imap
+  // (we don't pass these as arguments, so we just check which dimensions
+  // are still missing)
+  int r = my_rank; // needed for calculating index along dimension
+  int d = mpi_processes; // needed for calculating index along dimension
+  int distributed_dimensions_index = 0;
+  if (!my_rank) std::cout << "Distributed dimensions:" << std::endl;
+  for (int vardim_id = 0; vardim_id < n_dimensions; vardim_id++) {
+
+    if (count[vardim_id] == 0) { // the dimension hasn't been treated yet
+
+      dimension_id = dimension_ids[vardim_id];
+
+      // get name and length of dimension
+      size_t dim_length;
+      char dimension_name[NC_MAX_NAME+1];
+      if ((retval = nc_inq_dim(netcdf_id, dimension_id, dimension_name, &dim_length))) ERR(retval);
+      if (!my_rank) std::cout << "  dimension '" << dimension_name << "': length "
+          << dim_length << " divided into " << process_distribution[distributed_dimensions_index] << " parts" << std::endl;
+
+      // calculate index along dimension
+      // note: this is not immediately obvious, change with care!
+      d /= process_distribution[distributed_dimensions_index];
+      int dim_index = r / d;
+      r %= d;
+
+      int size_along_dim = dim_length / process_distribution[distributed_dimensions_index];
+
+      // write values into arrays
+      start[vardim_id] = dim_index * size_along_dim;
+      count[vardim_id] = size_along_dim;
+      if (dim_index == process_distribution[distributed_dimensions_index] - 1) {
+        // if we are the last process along a dimension, add the remainder
+        count[vardim_id] += dim_length % process_distribution[distributed_dimensions_index];
+      }
+      imap[vardim_id] = interelement_distance;
+
+      // the next variable has to change slower in the output array
+      interelement_distance *= count[vardim_id];
+      distributed_dimensions_index++;
+    }
+  }
+
+  int N_cols = interelement_distance / N_rows;
 
   // print which values are read by the current rank
   //std::cout << "Rank " << my_rank << " has data";

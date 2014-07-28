@@ -111,9 +111,6 @@ int main(int argc, char *argv[])
   std::vector<std::string> default_compressed_dims;
   default_compressed_dims.push_back("lon");
   default_compressed_dims.push_back("lat");
-  std::vector<std::string> default_distributed_dims;
-  default_distributed_dims.push_back("mlev");
-  default_distributed_dims.push_back("time");
 
   namespace po = boost::program_options;
   po::options_description po_description("USI Compression: Options");
@@ -123,9 +120,6 @@ int main(int argc, char *argv[])
     ("compressed,c", po::value< std::vector<std::string> >(&compressed_dims)
         ->default_value(default_compressed_dims, "lon,lat")->multitoken(), 
         "list of compressed dimensions")
-    ("distributed,d", po::value< std::vector<std::string> >(&distributed_dims)
-        ->default_value(default_distributed_dims, "mlev,time")->multitoken(), 
-        "list of distributed dimensions")
     ("indexed,i", po::value< std::vector<std::string> >(&indexed_dims)
         ->default_value(std::vector<std::string>(0), "none")->multitoken(),
         "list of indexed dimensions")
@@ -166,7 +160,7 @@ int main(int argc, char *argv[])
   //
 
   DeviceMatrix<Scalar> X = read_from_netcdf<Scalar>(filename, variable_name,
-      compressed_dims, distributed_dims, indexed_dims);
+      compressed_dims, indexed_dims);
   
   double time_after_reading_data = MPI_Wtime();
 
