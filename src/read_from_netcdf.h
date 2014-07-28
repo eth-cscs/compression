@@ -22,6 +22,16 @@
      /* Handle errors by printing an error message and exiting with a
       * non-zero status. */
 
+int nc_get_vara(int ncid, int varid, size_t start[], size_t
+    count[], double *dp) {
+  int retval = nc_get_vara_double(ncid, varid, start, count, dp);
+  return retval;
+}
+int nc_get_vara(int ncid, int varid, size_t start[], size_t
+    count[], float *fp) {
+  int retval = nc_get_vara_float(ncid, varid, start, count, fp);
+  return retval;
+}
 int nc_get_varm(int ncid, int varid, size_t start[], size_t
     count[], ptrdiff_t stride[], ptrdiff_t imap[], double *dp) {
   int retval = nc_get_varm_double(ncid, varid, start, count, stride,
@@ -222,16 +232,66 @@ DeviceMatrix<Scalar> read_from_netcdf(const std::string filename,
 
   // read values for output
   DeviceMatrix<Scalar> output_matrix(N_rows, N_cols);
+
 #if defined(USE_GPU)
   // if we want to use the GPU, we first need to read the matrix to the
   // host and copy it over to the device
   HostMatrix<Scalar> temp_matrix(N_rows, N_cols);
+#endif
+
+#if defined(IN_MEMORY_MAPPING)
+  Scalar* temp_array = new Scalar[N_rows * N_cols];
+
+  std::vector<int> dimension_indices(n_dimensions, 0);
+
+  if (!my_rank) std::cout << "start reading file" << std::endl;
+  if ((retval = nc_get_vara(netcdf_id, variable_id, start, count,
+          temp_array))) ERR(retval);
+  if (!my_rank) std::cout << "end reading file" << std::endl;
+
+  // resort using map
+  if (!my_rank) std::cout << "start resorting" << std::endl;
+  for (int i = 0; i < N_rows * N_cols; i++) { // loop through all data points
+
+    int output_index = 0;
+
+    // go through dimensions, from fastest to slowest changing
+    for (int d = n_dimensions-1; d >= 0; d--) {
+      if (dimension_indices[d] == count[d]) {
+        dimension_indices[d] = 0;
+        dimension_indices[d-1] += 1;
+      }
+
+      output_index += dimension_indices[d] * imap[d];
+    }
+
+#if defined(USE_GPU)
+    temp_matrix.pointer()[output_index] = temp_array[i];
+#else
+    GET_POINTER(output_matrix)[output_index] = temp_array[i];
+#endif
+
+    dimension_indices[n_dimensions-1]++; // increase index of fastest changing dimension
+  }
+  delete[] temp_array;
+  if (!my_rank) std::cout << "end resorting" << std::endl;
+
+#else
+
+#if defined(USE_GPU)
   if ((retval = nc_get_varm(netcdf_id, variable_id, start, count, NULL,
           imap, temp_matrix.pointer()))) ERR(retval);
-  output_matrix = temp_matrix;
 #else
   if ((retval = nc_get_varm(netcdf_id, variable_id, start, count, NULL,
           imap, GET_POINTER(output_matrix)))) ERR(retval);
+#endif
+
+#endif
+
+#if defined(USE_GPU)
+  if (!my_rank) std::cout << "start copying to device" << std::endl;
+  output_matrix = temp_matrix;
+  if (!my_rank) std::cout << "end copying to device" << std::endl;
 #endif
 
   // delete working arrays
