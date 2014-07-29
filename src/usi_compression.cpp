@@ -21,7 +21,7 @@ typedef double Scalar;     // feel free to change this to 'double' if supported 
 #include <boost/program_options.hpp>
 
 #include "matrices.h"
-#include "read_from_netcdf.h"
+#include "NetCDFInterface.h"
 #include "CompressedMatrix.h"
 #include "mpi_type_helper.h"
 
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
 
   int M_size, K_size;
   std::string filename;
-  std::string variable_name;
+  std::vector<std::string> variables;
   std::vector<std::string> compressed_dims;
   std::vector<std::string> distributed_dims;
   std::vector<std::string> indexed_dims;
@@ -129,12 +129,12 @@ int main(int argc, char *argv[])
         "the number of eigenvectors used for final compression (M)")
     ("file", po::value<std::string>(&filename)->required(),
         "the path to the NetCDF4 file")
-    ("variable", po::value<std::string>(&variable_name)->required(),
+    ("variables,v", po::value< std::vector<std::string> >(&variables)->required()->multitoken(),
         "the variable that is to be compressed")
     ;
 
   po::positional_options_description po_positional;
-  po_positional.add("file",1).add("variable",1);
+  po_positional.add("file",1);
   po::variables_map po_vm;
   po::store(po::command_line_parser(argc, argv).options(po_description)
       .positional(po_positional).run(), po_vm);
@@ -159,8 +159,9 @@ int main(int argc, char *argv[])
   // Read NetCDF Data
   //
 
-  DeviceMatrix<Scalar> X = read_from_netcdf<Scalar>(filename, variable_name,
+  NetCDFInterface<Scalar> netcdf_interface(filename, variables,
       compressed_dims, indexed_dims);
+  DeviceMatrix<Scalar> X = netcdf_interface.construct_matrix();
   
   double time_after_reading_data = MPI_Wtime();
 
