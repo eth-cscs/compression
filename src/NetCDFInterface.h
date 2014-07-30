@@ -54,6 +54,8 @@ public:
 
 private:
 
+  int r_; // used for NetCDF error handling only
+
   // initialized in constructor:
   std::string filename_;
   Stacking stacking_;
@@ -80,16 +82,6 @@ private:
 
 
 
-  int N_c_;
-  int N_d_;
-  int r_;
-
-  // variables for reordering the data
-  std::vector<int> row_offset_;             // for each variable
-  std::vector<int> col_offset_;             // for each variable
-
-
-
   std::vector< HostVector<Scalar> > read_data() {
 
     std::vector< HostVector<Scalar> > output(n_variables_);
@@ -105,40 +97,61 @@ private:
   }
 
 
-  HostMatrix<Scalar> restructure_data(std::vector< HostVector<Scalar> > data) {
+  HostMatrix<Scalar> restructure_data(std::vector< HostVector<Scalar> > &data) {
 
-    HostMatrix<Scalar> output(N_c_, N_d_);
+    int output_row_size = variable_rows_[0];
+    int output_col_size = variable_cols_[0];
+    for (int v = 1; v < n_variables_; v++) {
+      if (stacking_ == HORIZONTAL) {
+        assert(output_row_size == variable_rows_[v]);
+        output_col_size += variable_cols_[v];
+      } else {
+        assert(output_col_size == variable_cols_[v]);
+        output_row_size += variable_rows_[v];
+      }
+    }
 
+    HostMatrix<Scalar> output(output_row_size, output_col_size);
+
+    int row_offset = 0;
+    int col_offset = 0;
     for (int v = 0; v < n_variables_; v++) {
 
       std::vector<int> dim_indicies(variable_dims_[v], 0);
       for (int i = 0; i < data[v].size(); i++) {
 
-        int output_row = row_offset_[v];
-        int output_col = col_offset_[v];
-        // we leave out d=0 here as this would involve updating at index -1
-        // which doesn't exist. this situation shouldn't occur anyway.
-        for (int d = variable_dims_[v] - 1; d > 0; d--) {
+        int output_row = row_offset;
+        int output_col = col_offset;
+        //if (!my_rank_) std::cout << "dim_indicies: ";
+        for (int d = variable_dims_[v] - 1; d >= 0; d--) {
           // increase indices of next dimension and reset current index
           // if a dimension has reached the maximum
           if (dim_indicies[d] == count_[v][d]) {
             dim_indicies[d] = 0;
             dim_indicies[d-1] += 1;
           }
+          //if (!my_rank_) std::cout << dim_indicies[d] << " ";
           output_row += dim_indicies[d] * row_map_[v][d];
           output_col += dim_indicies[d] * col_map_[v][d];
         }
+        //if (!my_rank_) std::cout << "writing value " << data[v](i) << " to (" << output_row << ", " << output_col << ")" << std::endl;
         output(output_row, output_col) = data[v](i);
 
         // increase index along last dimension for next iteration
         dim_indicies[variable_dims_[v]-1]++;
+      }
+
+      if (stacking_ == HORIZONTAL) {
+        col_offset += variable_cols_[v];
+      } else {
+        row_offset += variable_rows_[v];
       }
     }
     return output;
   }
 
 
-  void initialize_data(const std::vector<std::string> variables) {
+  void initialize_data(const std::vector<std::string> &variables) {
 
     // initialize mpi
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_processes_);
@@ -161,6 +174,8 @@ private:
 
   void select_data_ranges() {
     /* This function sets up the internal variables start_ and count_. */
+    
+    variable_dims_ = std::vector<int>(n_variables_);
     
     start_  = std::vector< std::vector<size_t> >(n_variables_);
     count_  = std::vector< std::vector<size_t> >(n_variables_);
@@ -217,8 +232,8 @@ private:
   }
 
 
-  void calculate_distributed_dims_data_range(int variable,
-      std::vector<int> distributed_dims) {
+  void calculate_distributed_dims_data_range(const int variable,
+      const std::vector<int> &distributed_dims) {
     /* This sets up the start and count for the distributed dimensions of
      * 'variable'. The indices of the distributed dimenions among all the
      * dimensions of the variable are saved in 'distributed_dims'. The length
@@ -268,14 +283,17 @@ private:
 
 
   void set_up_mapping() {
+
+    row_map_ = std::vector< std::vector<int> >(n_variables_);
+    col_map_ = std::vector< std::vector<int> >(n_variables_);
       
     variable_rows_ = std::vector<int>(n_variables_);
     variable_cols_ = std::vector<int>(n_variables_);
 
-    row_offset_ = std::vector<int>(n_variables_, 0);
-    col_offset_ = std::vector<int>(n_variables_, 0);
-
     for (int v = 0; v < n_variables_; v++) {
+
+      row_map_[v] = std::vector<int>(variable_dims_[v]);
+      col_map_[v] = std::vector<int>(variable_dims_[v]);
 
       int row_interelement_distance = 1;
       int col_interelement_distance = 1;
@@ -285,6 +303,9 @@ private:
       std::vector<int> dim_ids(variable_dims_[v]);
       if ((r_ = nc_inq_vardimid(netcdf_id_, variable_ids_[v],
               &dim_ids[0]))) ERR(r_);
+
+      if (!my_rank_) std::cout << "Dimensions for variable " << v << ":"
+          << std::endl;
 
       // last dimensions are the fastest changing
       for (int d = variable_dims_[v] - 1; d >= 0; d--) {
@@ -298,6 +319,9 @@ private:
           // in this case, the values don't matter as they are multiplied by 0
           row_map_[v][d] = 0;
           col_map_[v][d] = 0;
+          if (!my_rank_) std::cout << "  " << dim_name
+              << " (indexed, selecting index " << indexed_dims_[dim_name]
+              << "), map: " << row_map_[v][d] << " " << col_map_[v][d] << std::endl;
         }
 
         else if (compressed_dims_.find(dim_name) != compressed_dims_.end()) {
@@ -305,6 +329,8 @@ private:
           row_map_[v][d] = row_interelement_distance;
           col_map_[v][d] = 0; // all values are in the same column
           row_interelement_distance *= count_[v][d];
+          if (!my_rank_) std::cout << "  " << dim_name << " (compressed, "
+              << count_[v][d] << " entries), map: " << row_map_[v][d] << " " << col_map_[v][d] << std::endl;
         }
         
         else {
@@ -312,22 +338,19 @@ private:
           row_map_[v][d] = 0; // all values are in the same row
           col_map_[v][d] = col_interelement_distance;
           col_interelement_distance *= count_[v][d];
+          if (!my_rank_) std::cout << "  " << dim_name
+              << " (distributed, selecting entries " << start_[v][d]
+              << " to " << start_[v][d] + count_[v][d] << "), map: " << row_map_[v][d] << " " << col_map_[v][d] << std::endl;
         }
       }
 
       variable_rows_[v] = row_interelement_distance;
       variable_cols_[v] = col_interelement_distance;
-
-      if (stacking_ == HORIZONTAL) {
-        col_offset_[v] += variable_cols_[v];
-      } else {
-        row_offset_[v] += variable_rows_[v];
-      }
     }
-
   }
 
-  std::vector<int> get_process_distribution(int n_distributed_dims) {
+
+  std::vector<int> get_process_distribution(const int n_distributed_dims) {
     /* This builds a list with the number of processes along each distributed
      * dimension. Note: We assume mpi_processes to be a power of 2. */
 
