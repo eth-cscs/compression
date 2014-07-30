@@ -127,6 +127,7 @@ int main(int argc, char *argv[])
         "the number of clusters used for PCA (K)")
     ("eigenvectors,M", po::value<int>(&M_size)->default_value(MSIZE),
         "the number of eigenvectors used for final compression (M)")
+    ("horizontal-stacking,h", "stack variables in distributed (horizontal) instead of compressed (vertical) direction")
     ("file", po::value<std::string>(&filename)->required(),
         "the path to the NetCDF4 file")
     ("variables,v", po::value< std::vector<std::string> >(&variables)->required()->multitoken(),
@@ -149,6 +150,13 @@ int main(int argc, char *argv[])
     return 1; // TODO: should this be an error or not?
   }
 
+  NetCDFInterface<Scalar>::Stacking stacking;
+  if (po_vm.count("horizontal-stacking")) {
+    stacking = NetCDFInterface<Scalar>::HORIZONTAL;
+  } else {
+    stacking = NetCDFInterface<Scalar>::VERTICAL;
+  }
+
   // this has to be after the help/version commands as this
   // exits with an error if the required arguments aren't
   // specified
@@ -160,7 +168,7 @@ int main(int argc, char *argv[])
   //
 
   NetCDFInterface<Scalar> netcdf_interface(filename, variables,
-      compressed_dims, indexed_dims);
+      compressed_dims, indexed_dims, stacking);
   DeviceMatrix<Scalar> X = netcdf_interface.construct_matrix();
   
   double time_after_reading_data = MPI_Wtime();
