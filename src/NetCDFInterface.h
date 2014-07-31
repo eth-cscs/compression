@@ -77,6 +77,7 @@ private:
   std::vector< std::vector<size_t> > count_;  // for each variable & dimension
 
   // initialized in set_up_mapping:
+  std::vector<bool> variable_is_empty_;       // for each variable
   std::vector<int> variable_rows_;            // for each variable
   std::vector<int> variable_cols_;            // for each variable
   std::vector< std::vector<int> > row_map_;   // for each variable & dimension
@@ -95,6 +96,8 @@ private:
               &(count_[v][0]), GET_POINTER(output[v])))) ERR(r_);
     }
 
+    if ((r_ = nc_close(netcdf_id_))) ERR(r_);
+    if (!my_rank_) std::cout << "Data successfully read from NetCDF file" << std::endl;
     return output;
   }
 
@@ -106,7 +109,7 @@ private:
     for (int v = 1; v < n_variables_; v++) {
       if (stacking_ == HORIZONTAL) {
         assert(output_row_size == variable_rows_[v]);
-        output_col_size += variable_cols_[v];
+        if (!variable_is_empty_[v]) output_col_size += variable_cols_[v];
       } else {
         assert(output_col_size == variable_cols_[v]);
         output_row_size += variable_rows_[v];
@@ -119,9 +122,9 @@ private:
     int col_offset = 0;
     for (int v = 0; v < n_variables_; v++) {
 
-      // these variables are set to zero at the end of set_up_mapping()
-      // for variables with no dimensions in one direction
-      if (variable_rows_[v] == 0 || variable_cols_[v] == 0) {
+      // variables with no dimensions in distributed direction are detected
+      // and set at the end of select_data_ranges()
+      if (variable_is_empty_[v]) {
         continue;
       }
 
@@ -155,6 +158,7 @@ private:
         row_offset += variable_rows_[v];
       }
     }
+    if (!my_rank_) std::cout << "Data successfully restructured into a 2D matrix" << std::endl;
     return output;
   }
 
@@ -183,7 +187,8 @@ private:
   void select_data_ranges() {
     /* This function sets up the internal variables start_ and count_. */
     
-    variable_dims_ = std::vector<int>(n_variables_);
+    variable_dims_     = std::vector<int>(n_variables_);
+    variable_is_empty_ = std::vector<bool>(n_variables_, false);
     
     start_  = std::vector< std::vector<size_t> >(n_variables_);
     count_  = std::vector< std::vector<size_t> >(n_variables_);
@@ -237,6 +242,17 @@ private:
       // this adds in the correct data ranges for the distributed dimensions
       if (distributed_dims.size()) {
         calculate_distributed_dims_data_range(v, distributed_dims);
+      } else {
+        // for variables that have no dimensions in the distributed direction
+        // (this should only happen if they are stacked horizontally),
+        // all processes get the data (there is no count in the distributed
+        // direction as the variable doesn't have a dimension in this
+        // direction). we therefore have to assign it to one of the processes
+        // here. we can then skip this variable when we load the data into the
+        // output matrix in restructure_data().
+        assert(stacking_ == HORIZONTAL);
+        if (process_getting_more_data_ != my_rank_) variable_is_empty_[v] = true;
+        increment_process_getting_more_data();
       }
     }
   }
@@ -296,7 +312,7 @@ private:
 
     row_map_ = std::vector< std::vector<int> >(n_variables_);
     col_map_ = std::vector< std::vector<int> >(n_variables_);
-      
+
     variable_rows_ = std::vector<int>(n_variables_);
     variable_cols_ = std::vector<int>(n_variables_);
 
@@ -307,9 +323,6 @@ private:
 
       int row_interelement_distance = 1;
       int col_interelement_distance = 1;
-
-      int n_compressed  = 0;
-      int n_distributed = 0;
 
       // NetCDF: get the ids of all dimensions for the variable
       // we use the dim_ids vector as an array here
@@ -339,7 +352,6 @@ private:
 
         else if (compressed_dims_.find(dim_name) != compressed_dims_.end()) {
           // the dimension is compressed
-          n_compressed++;
           row_map_[v][d] = row_interelement_distance;
           col_map_[v][d] = 0; // all values are in the same column
           row_interelement_distance *= count_[v][d];
@@ -349,7 +361,6 @@ private:
         
         else {
           // the dimension is distributed
-          n_distributed++;
           row_map_[v][d] = 0; // all values are in the same row
           col_map_[v][d] = col_interelement_distance;
           col_interelement_distance *= count_[v][d];
@@ -358,27 +369,8 @@ private:
               << " to " << start_[v][d] + count_[v][d] << "), map: " << row_map_[v][d] << " " << col_map_[v][d] << std::endl;
         }
       }
-
       variable_rows_[v] = row_interelement_distance;
       variable_cols_[v] = col_interelement_distance;
-
-      // for variables that have no dimensions in one direction
-      // (i.e. they are stacked this way), all processes get the
-      // data (there is no count in the distributed direction as
-      // the variable doesn't have a dimension in this direction).
-      // we therefore have to assign it to one of the processes here.
-      // by setting the row/column length to zero for all but one
-      // processes, we get the correct output_matrix dimensions.
-      // we also skip the copying the data into the output_matrix when
-      // these are set to zero.
-      if (n_compressed == 0) {
-        if (process_getting_more_data_ != my_rank_) variable_rows_[v] = 0;
-        increment_process_getting_more_data();
-      }
-      if (n_distributed == 0) {
-        if (process_getting_more_data_ != my_rank_) variable_cols_[v] = 0;
-        increment_process_getting_more_data();
-      }
     }
   }
 
