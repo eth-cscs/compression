@@ -22,21 +22,8 @@ public:
     // save internal variables
     filename_ = filename;
     stacking_ = stacking;
-    compressed_dims_ = std::set<std::string>(compressed_dims.begin(),
-        compressed_dims.end());
 
-    for (int i = 0; i < indexed_dims.size(); i++) {
-      size_t separator_index = indexed_dims[i].find("=");
-      if (separator_index == std::string::npos) {
-        if (!my_rank_) std::cout << "Error: Invalid separator for indexed dimension "
-          << indexed_dims[i] << std::endl;
-        exit(1);
-      }
-      std::string dim_name = indexed_dims[i].substr(0, separator_index);
-      indexed_dims_[dim_name] = std::atoi(indexed_dims[i].substr(separator_index+1).c_str());
-    }
-
-    initialize_data(variables);
+    initialize_data(variables, compressed_dims, indexed_dims);
     select_data_ranges();
     set_up_mapping();
   }
@@ -61,8 +48,6 @@ private:
   // initialized in constructor:
   std::string filename_;
   Stacking stacking_;
-  std::set<std::string> compressed_dims_;
-  std::map<std::string, int> indexed_dims_;
 
   // initialized in initialize_data:
   int mpi_processes_;
@@ -70,100 +55,47 @@ private:
   int netcdf_id_;
   int n_variables_;
   std::vector<int> variable_ids_;             // for each variable
+  std::set<std::string> compressed_dims_;
+  std::map<std::string, int> indexed_dims_;
 
   // initialized in select_data_ranges:
   std::vector<int> variable_dims_;            // for each variable
+  std::vector<bool> variable_is_empty_;       // for each variable
   std::vector< std::vector<size_t> > start_;  // for each variable & dimension
   std::vector< std::vector<size_t> > count_;  // for each variable & dimension
 
   // initialized in set_up_mapping:
-  std::vector<bool> variable_is_empty_;       // for each variable
   std::vector<int> variable_rows_;            // for each variable
   std::vector<int> variable_cols_;            // for each variable
   std::vector< std::vector<int> > row_map_;   // for each variable & dimension
   std::vector< std::vector<int> > col_map_;   // for each variable & dimension
 
 
-
-  std::vector< HostVector<Scalar> > read_data() {
-
-    std::vector< HostVector<Scalar> > output(n_variables_);
-
-    for (int v = 0; v < n_variables_; v++) {
-      output[v] = HostVector<Scalar>(variable_rows_[v] * variable_cols_[v]);
-      // NetCDF: get data array for variable
-      if ((r_ = nc_get_vara(netcdf_id_, variable_ids_[v], &(start_[v][0]),
-              &(count_[v][0]), GET_POINTER(output[v])))) ERR(r_);
-    }
-
-    if ((r_ = nc_close(netcdf_id_))) ERR(r_);
-    if (!my_rank_) std::cout << "Data successfully read from NetCDF file" << std::endl;
-    return output;
+  int nc_get_vara(int ncid, int varid, size_t start[], size_t
+      count[], double *dp) {
+    int retval = nc_get_vara_double(ncid, varid, start, count, dp);
+    return retval;
   }
 
 
-  HostMatrix<Scalar> restructure_data(std::vector< HostVector<Scalar> > &data) {
-
-    int output_row_size = variable_rows_[0];
-    int output_col_size = variable_cols_[0];
-    for (int v = 1; v < n_variables_; v++) {
-      if (stacking_ == HORIZONTAL) {
-        assert(output_row_size == variable_rows_[v]);
-        if (!variable_is_empty_[v]) output_col_size += variable_cols_[v];
-      } else {
-        assert(output_col_size == variable_cols_[v]);
-        output_row_size += variable_rows_[v];
-      }
-    }
-
-    HostMatrix<Scalar> output(output_row_size, output_col_size);
-
-    int row_offset = 0;
-    int col_offset = 0;
-    for (int v = 0; v < n_variables_; v++) {
-
-      // variables with no dimensions in distributed direction are detected
-      // and set at the end of select_data_ranges()
-      if (variable_is_empty_[v]) {
-        continue;
-      }
-
-      std::vector<int> dim_indicies(variable_dims_[v], 0);
-      for (int i = 0; i < data[v].size(); i++) {
-
-        int output_row = row_offset;
-        int output_col = col_offset;
-        //if (!my_rank_) std::cout << "dim_indicies: ";
-        for (int d = variable_dims_[v] - 1; d >= 0; d--) {
-          // increase indices of next dimension and reset current index
-          // if a dimension has reached the maximum
-          if (dim_indicies[d] == count_[v][d]) {
-            dim_indicies[d] = 0;
-            dim_indicies[d-1] += 1;
-          }
-          //if (!my_rank_) std::cout << dim_indicies[d] << " ";
-          output_row += dim_indicies[d] * row_map_[v][d];
-          output_col += dim_indicies[d] * col_map_[v][d];
-        }
-        //if (!my_rank_) std::cout << "writing value " << data[v](i) << " to (" << output_row << ", " << output_col << ")" << std::endl;
-        output(output_row, output_col) = data[v](i);
-
-        // increase index along last dimension for next iteration
-        dim_indicies[variable_dims_[v]-1]++;
-      }
-
-      if (stacking_ == HORIZONTAL) {
-        col_offset += variable_cols_[v];
-      } else {
-        row_offset += variable_rows_[v];
-      }
-    }
-    if (!my_rank_) std::cout << "Data successfully restructured into a 2D matrix" << std::endl;
-    return output;
+  int nc_get_vara(int ncid, int varid, size_t start[], size_t
+      count[], float *fp) {
+    int retval = nc_get_vara_float(ncid, varid, start, count, fp);
+    return retval;
   }
 
 
-  void initialize_data(const std::vector<std::string> &variables) {
+  void increment_process_getting_more_data() {
+    process_getting_more_data_++;
+    if (process_getting_more_data_ == mpi_processes_) {
+      process_getting_more_data_ = 0;
+    }
+  }
+
+
+  void initialize_data(const std::vector<std::string> &variables,
+      const std::vector<std::string> &compressed_dims,
+      const std::vector<std::string> &indexed_dims) {
 
     // initialize mpi
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_processes_);
@@ -179,6 +111,20 @@ private:
       // NetCDF: get variable ids
       if ((r_ = nc_inq_varid(netcdf_id_, variables[v].c_str(),
               &variable_ids_[v]))) ERR(r_);
+    }
+    
+    compressed_dims_ = std::set<std::string>(compressed_dims.begin(),
+        compressed_dims.end());
+
+    for (int i = 0; i < indexed_dims.size(); i++) {
+      size_t separator_index = indexed_dims[i].find("=");
+      if (separator_index == std::string::npos) {
+        if (!my_rank_) std::cout << "Error: Invalid separator for indexed dimension "
+          << indexed_dims[i] << std::endl;
+        exit(1);
+      }
+      std::string dim_name = indexed_dims[i].substr(0, separator_index);
+      indexed_dims_[dim_name] = std::atoi(indexed_dims[i].substr(separator_index+1).c_str());
     }
 
   }
@@ -295,16 +241,26 @@ private:
     }
   }
 
-  int nc_get_vara(int ncid, int varid, size_t start[], size_t
-      count[], double *dp) {
-    int retval = nc_get_vara_double(ncid, varid, start, count, dp);
-    return retval;
-  }
 
-  int nc_get_vara(int ncid, int varid, size_t start[], size_t
-      count[], float *fp) {
-    int retval = nc_get_vara_float(ncid, varid, start, count, fp);
-    return retval;
+  std::vector<int> get_process_distribution(const int n_distributed_dims) {
+    /* This builds a list with the number of processes along each distributed
+     * dimension. Note: We assume mpi_processes to be a power of 2. */
+
+    int p = mpi_processes_;
+    int i = 0;
+    std::vector<int> process_distribution(n_distributed_dims, 1);
+
+    while (p > 1) {
+      if (p % 2 != 0) {
+        std::cout << "Error: The number of processes must be a power of 2" << std::endl;
+        exit(1);
+      }
+      p /= 2;
+      process_distribution[i] *= 2;
+      // restart at the beginning if the last dimension is reached
+      i = (i + 1) % process_distribution.size();
+    }
+    return process_distribution;
   }
 
 
@@ -375,32 +331,81 @@ private:
   }
 
 
-  std::vector<int> get_process_distribution(const int n_distributed_dims) {
-    /* This builds a list with the number of processes along each distributed
-     * dimension. Note: We assume mpi_processes to be a power of 2. */
+  std::vector< HostVector<Scalar> > read_data() {
 
-    int p = mpi_processes_;
-    int i = 0;
-    std::vector<int> process_distribution(n_distributed_dims, 1);
+    std::vector< HostVector<Scalar> > output(n_variables_);
 
-    while (p > 1) {
-      if (p % 2 != 0) {
-        std::cout << "Error: The number of processes must be a power of 2" << std::endl;
-        exit(1);
-      }
-      p /= 2;
-      process_distribution[i] *= 2;
-      // restart at the beginning if the last dimension is reached
-      i = (i + 1) % process_distribution.size();
+    for (int v = 0; v < n_variables_; v++) {
+      output[v] = HostVector<Scalar>(variable_rows_[v] * variable_cols_[v]);
+      // NetCDF: get data array for variable
+      if ((r_ = nc_get_vara(netcdf_id_, variable_ids_[v], &(start_[v][0]),
+              &(count_[v][0]), GET_POINTER(output[v])))) ERR(r_);
     }
-    return process_distribution;
+
+    if ((r_ = nc_close(netcdf_id_))) ERR(r_);
+    if (!my_rank_) std::cout << "Data successfully read from NetCDF file" << std::endl;
+    return output;
   }
 
-  void increment_process_getting_more_data() {
-    process_getting_more_data_++;
-    if (process_getting_more_data_ == mpi_processes_) {
-      process_getting_more_data_ = 0;
+
+  HostMatrix<Scalar> restructure_data(std::vector< HostVector<Scalar> > &data) {
+
+    int output_row_size = variable_rows_[0];
+    int output_col_size = variable_cols_[0];
+    for (int v = 1; v < n_variables_; v++) {
+      if (stacking_ == HORIZONTAL) {
+        assert(output_row_size == variable_rows_[v]);
+        if (!variable_is_empty_[v]) output_col_size += variable_cols_[v];
+      } else {
+        assert(output_col_size == variable_cols_[v]);
+        output_row_size += variable_rows_[v];
+      }
     }
+
+    HostMatrix<Scalar> output(output_row_size, output_col_size);
+
+    int row_offset = 0;
+    int col_offset = 0;
+    for (int v = 0; v < n_variables_; v++) {
+
+      // variables with no dimensions in distributed direction are detected
+      // and set at the end of select_data_ranges()
+      if (variable_is_empty_[v]) {
+        continue;
+      }
+
+      std::vector<int> dim_indicies(variable_dims_[v], 0);
+      for (int i = 0; i < data[v].size(); i++) {
+
+        int output_row = row_offset;
+        int output_col = col_offset;
+        //if (!my_rank_) std::cout << "dim_indicies: ";
+        for (int d = variable_dims_[v] - 1; d >= 0; d--) {
+          // increase indices of next dimension and reset current index
+          // if a dimension has reached the maximum
+          if (dim_indicies[d] == count_[v][d]) {
+            dim_indicies[d] = 0;
+            dim_indicies[d-1] += 1;
+          }
+          //if (!my_rank_) std::cout << dim_indicies[d] << " ";
+          output_row += dim_indicies[d] * row_map_[v][d];
+          output_col += dim_indicies[d] * col_map_[v][d];
+        }
+        //if (!my_rank_) std::cout << "writing value " << data[v](i) << " to (" << output_row << ", " << output_col << ")" << std::endl;
+        output(output_row, output_col) = data[v](i);
+
+        // increase index along last dimension for next iteration
+        dim_indicies[variable_dims_[v]-1]++;
+      }
+
+      if (stacking_ == HORIZONTAL) {
+        col_offset += variable_cols_[v];
+      } else {
+        row_offset += variable_rows_[v];
+      }
+    }
+    if (!my_rank_) std::cout << "Data successfully restructured into a 2D matrix" << std::endl;
+    return output;
   }
 
 };
