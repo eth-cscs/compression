@@ -64,12 +64,12 @@ public:
 private:
 
   int r_; // used for NetCDF error handling only
-  int process_getting_more_data_ = 0; // used when data can't be distributed
-                                      // evenly between processes
 
   // initialized in constructor:
   std::string filename_;
   Stacking stacking_;
+  int process_getting_more_data_; // used when data can't be distributed
+                                  // evenly between processes
 
   // initialized in initialize_data:
   int mpi_processes_;
@@ -132,6 +132,9 @@ private:
   void initialize_data(const std::vector<std::string> &variables,
       const std::vector<std::string> &compressed_dims,
       const std::vector<std::string> &indexed_dims) {
+
+    // first process gets more data first if needed
+    process_getting_more_data_ = 0;
 
     // initialize mpi
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_processes_);
