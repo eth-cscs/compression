@@ -1,7 +1,7 @@
 #include <vector>
 #include <netcdf_par.h>
 #include <netcdf.h>
-#include "mpi.h"
+#include <mpi.h>
 
 #define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(1);}
 
@@ -28,12 +28,6 @@ public:
     set_up_mapping();
   }
 
-  ~NetCDFInterface() { // destructor
-    if ((r_ = nc_close(netcdf_id_))) ERR(r_);
-    if (!my_rank_) std::cout << "NetCDF file closed." << std::endl;
-  }
-
-
 
   DeviceMatrix<Scalar> construct_matrix() {
 
@@ -47,13 +41,23 @@ public:
 
   void write_matrix(DeviceMatrix<Scalar> input) {
 
+    std::string filename_out = filename_.substr(0,filename_.length()-4)
+        + "_reconstructed.nc4";
+
     HostMatrix<Scalar> data = input; // copy to host
     std::vector< HostVector<Scalar> > recomposed_data = recompose_data(data);
     // only the first process creates the new file
-    if (!my_rank_) setup_output_file("output.nc4");
-    MPI_Barrier(MPI_COMM_WORLD); // only continue after file has been created
-    write_data("output.nc4", recomposed_data);
+    if (!my_rank_) setup_output_file(filename_out);
+    // only continue after file has been created
+    MPI_Barrier(MPI_COMM_WORLD);
+    write_data(filename_out, recomposed_data);
 
+  }
+
+
+  void close() {
+    if ((r_ = nc_close(netcdf_id_))) ERR(r_);
+    if (!my_rank_) std::cout << "NetCDF file closed." << std::endl;
   }
 
 

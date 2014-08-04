@@ -223,20 +223,14 @@ int main(int argc, char *argv[])
   // Write Reconstructed Data to File
   //
 
-  int retval;
-  // TODO: this line doesn't return, fix this
-  //if ((retval = nc_put_vara_double(ncid_out, varid_out, start, count, GET_POINTER(Xreconstructed) ))) ERR(retval);
-  //if ((retval = nc_close(ncid_out))) ERR(retval);
+  netcdf_interface.write_matrix(X_reconstructed);
 
 
   //
   //  Terminate MPI and Quit Program.
   //
 
-  retval =  0;
-  if (!my_rank) std::cout << "retval " << retval << std::endl;
-
+  netcdf_interface.close();
   MPI_Finalize();
-
   return 0;
 }
