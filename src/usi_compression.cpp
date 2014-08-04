@@ -170,8 +170,6 @@ int main(int argc, char *argv[])
   NetCDFInterface<Scalar> netcdf_interface(filename, variables,
       compressed_dims, indexed_dims, stacking);
   DeviceMatrix<Scalar> X = netcdf_interface.construct_matrix();
-  netcdf_interface.write_matrix(X);
-  exit(0);
   
   double time_after_reading_data = MPI_Wtime();
 

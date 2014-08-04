@@ -28,6 +28,12 @@ public:
     set_up_mapping();
   }
 
+  ~NetCDFInterface() { // destructor
+    if ((r_ = nc_close(netcdf_id_))) ERR(r_);
+    if (!my_rank_) std::cout << "NetCDF file closed." << std::endl;
+  }
+
+
 
   DeviceMatrix<Scalar> construct_matrix() {
 
@@ -45,8 +51,7 @@ public:
     std::vector< HostVector<Scalar> > recomposed_data = recompose_data(data);
     // only the first process creates the new file
     if (!my_rank_) setup_output_file("output.nc4");
-    MPI_Barrier(MPI_COMM_WORLD);
-    std::cout << "continuing after barrier" << std::endl;
+    MPI_Barrier(MPI_COMM_WORLD); // only continue after file has been created
     write_data("output.nc4", recomposed_data);
 
   }
@@ -183,6 +188,9 @@ private:
       if ((r_ = nc_inq_vardimid(netcdf_id_, variable_ids_[v],
               &dim_ids[0]))) ERR(r_);
 
+      if (!my_rank_) std::cout << "Dimensions for variable " << v << ":"
+          << std::endl;
+
       for (int d = 0; d < variable_dims_[v]; d++) {
 
         // NetCDF: get dimension name & length
@@ -195,12 +203,17 @@ private:
           // the dimension is indexed
           start_[v][d] = indexed_dims_[dim_name];
           count_[v][d] = 1;
+          if (!my_rank_) std::cout << "  " << dim_name
+              << " (indexed, selecting index " << indexed_dims_[dim_name]
+              << ")" << std::endl;
         }
 
         else if (compressed_dims_.find(dim_name) != compressed_dims_.end()) {
           // the dimension is compressed
           start_[v][d] = 0;
           count_[v][d] = dim_length;
+          if (!my_rank_) std::cout << "  " << dim_name << " (compressed, "
+              << dim_length << " entries)" << std::endl;
         }
         
         else {
@@ -209,6 +222,8 @@ private:
           // this loop and treat them separately afterwards
           distributed_dims.push_back(d);
           count_[v][d] = dim_length; // will be changed afterwards
+          if (!my_rank_) std::cout << "  " << dim_name
+              << " (distributed, " << dim_length << " entries)" << std::endl;
         }
       }
 
@@ -313,9 +328,6 @@ private:
       if ((r_ = nc_inq_vardimid(netcdf_id_, variable_ids_[v],
               &dim_ids[0]))) ERR(r_);
 
-      if (!my_rank_) std::cout << "Dimensions for variable " << v << ":"
-          << std::endl;
-
       // last dimensions are the fastest changing
       for (int d = variable_dims_[v] - 1; d >= 0; d--) {
 
@@ -328,9 +340,6 @@ private:
           // in this case, the values don't matter as they are multiplied by 0
           row_map_[v][d] = 0;
           col_map_[v][d] = 0;
-          if (!my_rank_) std::cout << "  " << dim_name
-              << " (indexed, selecting index " << indexed_dims_[dim_name]
-              << "), map: " << row_map_[v][d] << " " << col_map_[v][d] << std::endl;
         }
 
         else if (compressed_dims_.find(dim_name) != compressed_dims_.end()) {
@@ -338,8 +347,6 @@ private:
           row_map_[v][d] = row_interelement_distance;
           col_map_[v][d] = 0; // all values are in the same column
           row_interelement_distance *= count_[v][d];
-          if (!my_rank_) std::cout << "  " << dim_name << " (compressed, "
-              << count_[v][d] << " entries), map: " << row_map_[v][d] << " " << col_map_[v][d] << std::endl;
         }
         
         else {
@@ -347,9 +354,6 @@ private:
           row_map_[v][d] = 0; // all values are in the same row
           col_map_[v][d] = col_interelement_distance;
           col_interelement_distance *= count_[v][d];
-          if (!my_rank_) std::cout << "  " << dim_name
-              << " (distributed, selecting entries " << start_[v][d]
-              << " to " << start_[v][d] + count_[v][d] << "), map: " << row_map_[v][d] << " " << col_map_[v][d] << std::endl;
         }
       }
       variable_rows_[v] = row_interelement_distance;
@@ -369,8 +373,7 @@ private:
               &(count_[v][0]), GET_POINTER(output[v])))) ERR(r_);
     }
 
-    if ((r_ = nc_close(netcdf_id_))) ERR(r_);
-    if (!my_rank_) std::cout << "Data successfully read from NetCDF file" << std::endl;
+    if (!my_rank_) std::cout << "Data read from NetCDF file" << std::endl;
     return output;
   }
 
@@ -406,7 +409,6 @@ private:
 
         int output_row = row_offset;
         int output_col = col_offset;
-        //if (!my_rank_) std::cout << "dim_indicies: ";
         for (int d = variable_dims_[v] - 1; d >= 0; d--) {
           // increase indices of next dimension and reset current index
           // if a dimension has reached the maximum
@@ -414,11 +416,9 @@ private:
             dim_indicies[d] = 0;
             dim_indicies[d-1] += 1;
           }
-          //if (!my_rank_) std::cout << dim_indicies[d] << " ";
           output_row += dim_indicies[d] * row_map_[v][d];
           output_col += dim_indicies[d] * col_map_[v][d];
         }
-        //if (!my_rank_) std::cout << "writing value " << data[v](i) << " to (" << output_row << ", " << output_col << ")" << std::endl;
         output(output_row, output_col) = data[v](i);
 
         // increase index along last dimension for next iteration
@@ -431,7 +431,7 @@ private:
         row_offset += variable_rows_[v];
       }
     }
-    if (!my_rank_) std::cout << "Data successfully restructured into a 2D matrix" << std::endl;
+    if (!my_rank_) std::cout << "Data restructured into a 2D matrix" << std::endl;
     return output;
   }
 
@@ -457,7 +457,6 @@ private:
 
         int data_row = row_offset;
         int data_col = col_offset;
-        //if (!my_rank_) std::cout << "dim_indicies: ";
         for (int d = variable_dims_[v] - 1; d >= 0; d--) {
           // increase indices of next dimension and reset current index
           // if a dimension has reached the maximum
@@ -465,11 +464,9 @@ private:
             dim_indicies[d] = 0;
             dim_indicies[d-1] += 1;
           }
-          //if (!my_rank_) std::cout << dim_indicies[d] << " ";
           data_row += dim_indicies[d] * row_map_[v][d];
           data_col += dim_indicies[d] * col_map_[v][d];
         }
-        //if (!my_rank_) std::cout << "writing value " << data[v](i) << " to (" << output_row << ", " << output_col << ")" << std::endl;
         output[v](i) = data(data_row, data_col);
 
         // increase index along last dimension for next iteration
@@ -493,26 +490,19 @@ private:
 
     // NetCDF: create new file, overwriting if it already exists
     int netcdf_id_out;
-    std::cout << "creating file" << std::endl;
-    if ((r_ = nc_create_par(filename_out.c_str(), NC_CLOBBER|NC_NETCDF4|NC_MPIIO,
-            MPI_COMM_WORLD, MPI_INFO_NULL, &netcdf_id_out))) ERR(r_);
-
-    // NetCDF: put output file into define mode
-    std::cout << "putting file in define mode" << std::endl;
-    //if ((r_ = nc_redef(netcdf_id_out))) ERR(r_);
+    if ((r_ = nc_create(filename_out.c_str(), NC_CLOBBER|NC_NETCDF4,
+            &netcdf_id_out))) ERR(r_);
 
     // create dimensions & variables
-    std::cout << "creating dimensions" << std::endl;
     std::map<int, int> dimension_map = create_all_dimensions(netcdf_id_out);
-    std::cout << "creating variables" << std::endl;
     create_all_variables(netcdf_id_out, dimension_map);
-    std::cout << "file created" << std::endl;
 
     // NetCDF: end define mode and close output file
     if ((r_ = nc_enddef(netcdf_id_out))) ERR(r_);
     if ((r_ = nc_close(netcdf_id_out))) ERR(r_);
-
+    std::cout << "NetCDF output file created" << std::endl;
   }
+
 
   std::map<int, int> create_all_dimensions(int netcdf_id_out) {
     /* collects all dimensions that are used by some of the variables
@@ -524,7 +514,6 @@ private:
     std::set<int> all_used_dim_ids;
     for (int v = 0; v < n_variables_; v++) {
       std::vector<int> dim_ids(variable_dims_[v]);
-      std::cout << "searching variable " << variable_ids_[v] << std::endl;
       // NetCDF: get the ids of all dimensions for the variable
       if ((r_ = nc_inq_vardimid(netcdf_id_, variable_ids_[v],
               &dim_ids[0]))) ERR(r_);
@@ -535,7 +524,8 @@ private:
     
     // create all dimensions
     std::map<int,int> dim_map;
-    for (std::set<int>::iterator dim = all_used_dim_ids.begin(); dim != all_used_dim_ids.end(); dim++) {
+    for (std::set<int>::iterator dim = all_used_dim_ids.begin();
+        dim != all_used_dim_ids.end(); dim++) {
       char dim_name[NC_MAX_NAME+1];
       size_t dim_length;
       // NetCDF: get name and length for each dimension
@@ -548,6 +538,7 @@ private:
 
     return dim_map;
   }
+
 
   void create_all_variables(int netcdf_id_out, std::map<int, int> dim_map) {
 
@@ -581,24 +572,23 @@ private:
 
     // NetCDF: open file for read/write access
     int netcdf_id_out;
-    if ((r_ = nc_open_par(filename_out.c_str(), NC_MPIIO, MPI_COMM_WORLD,
-            MPI_INFO_NULL, &netcdf_id_out))) ERR(r_);
-
+    if ((r_ = nc_open_par(filename_out.c_str(), NC_MPIIO|NC_WRITE,
+            MPI_COMM_WORLD, MPI_INFO_NULL, &netcdf_id_out))) ERR(r_);
 
     std::vector<int> new_variable_ids = get_new_variable_ids(netcdf_id_out);
-
 
     for (int v = 0; v < n_variables_; v++) {
       if (variable_is_empty_[v]) continue;
 
-      // NetCDF: write data array for variable (TODO: change variable_ids_)
+      // NetCDF: write data array for variable
       if ((r_ = nc_put_vara(netcdf_id_out, new_variable_ids[v], &(start_[v][0]),
               &(count_[v][0]), GET_POINTER(data[v])))) ERR(r_);
     }
 
-    if ((r_ = nc_close(netcdf_id_))) ERR(r_);
-    if (!my_rank_) std::cout << "Data successfully written to NetCDF file" << std::endl;
+    if ((r_ = nc_close(netcdf_id_out))) ERR(r_);
+    if (!my_rank_) std::cout << "Data written to NetCDF file" << std::endl;
   }
+
 
   std::vector<int> get_new_variable_ids(int netcdf_id_out) {
 
@@ -620,34 +610,6 @@ private:
     }
 
     return new_variable_ids;
-
-  }
-
-  std::vector<int> get_new_dimension_ids(int netcdf_id_out, int v) {
-    /* this returns a map of the old dimension ids to the new ones for a given
-     * variable. */
-
-    std::vector<int> new_dimension_ids(variable_dims_[v]);
-
-    std::vector<int> dim_ids(variable_dims_[v]);
-    // NetCDF: get dimension ids for variable
-    if ((r_ = nc_inq_varndims(netcdf_id_, variable_ids_[v],
-            &dim_ids[0]))) ERR(r_);
-
-    for (int d = 0; d < variable_dims_[v]; d++) {
-      char dim_name[NC_MAX_NAME+1];
-      // NetCDF: get dimension name from id
-      if ((r_ = nc_inq_dimname(netcdf_id_, dim_ids[d],
-              dim_name))) ERR(r_);
-      int new_dim_id;
-      // NetCDF: get dimension id from output file
-      if ((r_ = nc_inq_dimid(netcdf_id_out, dim_name,
-              &new_dim_id))) ERR(r_);
-
-      new_dimension_ids[d] = new_dim_id;
-    }
-
-    return new_dimension_ids;
 
   }
 
