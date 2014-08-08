@@ -268,9 +268,31 @@ private:
 
     for (int i = 0; i < distributed_dims.size(); i++) {
 
-      // find index along dimension
-      // note: this is not immediately obvious, change with care!
-      // TODO: explanation
+      // In order to split the data between the processes, each process needs
+      // to be assigned a unique index along each distributed dimension. This
+      // index is then used to calculate the start and end index for the data.
+      //
+      // We assign an index along each dimension based on the rank of the
+      // current process. For three distributed dimensions, the first process
+      // would get 0-0-0, the second gets 0-0-1 and so on. This is similar to
+      // the conversion of a number to a different base. In fact, if there are
+      // two processes along each dimension, it corresponds to the binary
+      // representation of the rank.
+      //
+      // To calculate this, we start with the first 'digit'. For decimal
+      // numbers (corresponding to 10 processes along each dimension),
+      // this would be the rank divided by 10^n, where n is the number of
+      // following dimensions. In our case, this is the rank divided by the
+      // product of the number of processes along all following dimensions.
+      // For the second 'digit', we proceed with the remainder of this
+      // division.
+      //
+      // In the following code, we use p as the product of the number of
+      // processes along all following dimensions. As the product of for all
+      // dimensions is given by the overall number of processes, we start with
+      // this and continue dividing by the number of processes along the
+      // current dimension. This leaves us with the product for all remaining
+      // dimensions.
       p /= process_distribution[i];
       int dim_index = r / p;
       r %= p;
