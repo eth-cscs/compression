@@ -142,12 +142,12 @@ int main(int argc, char *argv[])
 
   if (po_vm.count("help")) {
     if (!my_rank) std::cout << po_description << std::endl;
-    return 1; // TODO: should this be an error or not?
+    return 0;
   }
 
   if (po_vm.count("version")) {
     if (!my_rank) std::cout << "USI Compression, Version " << VERSION << std::endl;
-    return 1; // TODO: should this be an error or not?
+    return 0;
   }
 
   NetCDFInterface<Scalar>::Stacking stacking;
