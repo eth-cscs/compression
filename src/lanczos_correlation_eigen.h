@@ -93,6 +93,7 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
       // find eigenvectors/eigenvalues for the reduced triangular system
       Eigen::SelfAdjointEigenSolver<DeviceMatrix<Scalar>> eigensolver(Trid.block(0,0,j+1,j+1));
       if (eigensolver.info() != Eigen::Success) abort();
+      // Eigen returns eigenvalues and -vectors in ascending order
       DeviceVector<Scalar>  eigs = eigensolver.eigenvalues().block(j+1-ne,0,ne,1);  // ne largest Ritz values, sorted ascending
       DeviceMatrix<Scalar> UT = eigensolver.eigenvectors();   // Ritz vectors
       // std::cout << "iteration : " << j << ", Tblock : " << Trid.block(0,0,j+1,j+1) << std::endl;
@@ -109,10 +110,10 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
       //
       ////////////////////////////////////////////////////////////////////
 
-      Scalar max_err = 0.0;
 
-      // TODO: sadly Eigen only returns these in ascending order; fix this
-      for(int count=ne-1; count>=0 && !converged; count--){
+      // error estimation
+      Scalar max_err = 0.0;
+      for (int count = 0; count < ne; count++) {
         Scalar this_eig = eigs(count);
         // std::cout << "iteration : " << j << ", this_eig : " << this_eig << std::endl;
         if (Xtranslated.cols() > 0) {
@@ -131,16 +132,14 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
         r -= GET_COLUMN(EV,count) * this_eig;   //residual
         Scalar this_err = std::abs( GET_NORM(r) / this_eig );
         max_err = std::max(max_err, this_err);
-        // terminate early if the current error exceeds the tolerance
-        // std::cout << "iteration : " << j << " count " << count << ", this_eig : " << this_eig << "max_err" << max_err << std::endl;
 
-        if(max_err > tol)
-          break;
+        // terminate early if the current error exceeds the tolerance
+        if(max_err > tol) break;
       } // end-for error estimation
+
       // test for convergence
-      if(max_err < tol) {
-        converged = true;
-      }
+      if(max_err < tol) converged = true;
+
     } // end-if estimate eigenvalues
   } // end-for main
   // return failure if no convergence
