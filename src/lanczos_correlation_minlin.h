@@ -1,6 +1,10 @@
 #pragma once
-#include <mkl.h>
+#include <cstdlib>   // std::abs
+#include <algorithm> // std::copy, std::max
+#include <mkl.h>     // ssteqr, dsteqr
+#include <mpi.h>     // MPI_Allreduce
 #include "mpi_type_helper.h"
+#include "matrices.h"
 
 /**
 	   This template performs the Lanczos algorithm on a correlation

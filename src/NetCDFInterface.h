@@ -1,7 +1,13 @@
-#include <vector>
+#pragma once
+#include <iostream> // std::cout, std::endl
+#include <string>   // std::string
+#include <vector>   // std::vector
+#include <set>      // std::set
+#include <map>      // std::map
+#include <mpi.h>    // MPI_Comm_size, MPI_Comm_rank, MPI_Barrier
 #include <netcdf_par.h>
 #include <netcdf.h>
-#include <mpi.h>
+#include "matrices.h"
 
 #define ERR(e) {printf("Error: %s\n", nc_strerror(e)); exit(1);}
 

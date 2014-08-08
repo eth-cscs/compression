@@ -9,22 +9,15 @@
 typedef double Scalar;     // feel free to change this to 'double' if supported by your hardware
 
 
-
-#if defined(USE_EIGEN)
-#include <random>
-#endif
-
-#include <algorithm>
-#include <mpi.h>
-#include <mkl.h>
-#include <iostream> 
+#include <iostream> // std::cout, std::endl
+#include <string>   // std::string
+#include <vector>   // std::vector
 #include <boost/program_options.hpp>
-
+#include <mpi.h>    // MPI_Init, MPI_Comm_size, MPI_Comm_rank, MPI_Allreduce, MPI_Finalize
+#include "mpi_type_helper.h"
 #include "matrices.h"
 #include "NetCDFInterface.h"
 #include "CompressedMatrix.h"
-#include "mpi_type_helper.h"
-
 
 /**
 	   Write description of function here.

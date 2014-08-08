@@ -1,5 +1,11 @@
-#include "matrices.h"
+#pragma once
+#include <cstdlib>  // std::srand (Eigen only)
+#include <iostream> // std::cout, std::endl
+#include <vector>   // std::vector
+#include <limits>   // std::numeric_limits
+#include <mpi.h>    // MPI_Comm_size, MPI_Comm_rank, MPI_Allreduce, MPI_Allgather
 #include "mpi_type_helper.h"
+#include "matrices.h"
 
 #if defined(USE_EIGEN)
 #include "lanczos_correlation_eigen.h"
@@ -108,7 +114,7 @@ private:
 
 #if defined( USE_EIGEN )
     // initialize random seed used in lanczos algorithm
-    srand(RANDOM_SEED);
+    std::srand(RANDOM_SEED);
 #endif
 
     for (int iter = 0; iter < MAX_ITER; iter++) {

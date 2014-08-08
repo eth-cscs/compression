@@ -26,6 +26,7 @@ template<class Scalar> using DeviceVector = Eigen::Matrix<Scalar, Eigen::Dynamic
 
 #include <minlin/minlin.h>
 #include <minlin/modules/threx/threx.h>
+#include <mkl.h> // sger, dger
 using minlin::threx::HostMatrix;
 using minlin::threx::DeviceMatrix;
 using minlin::threx::HostVector;
