@@ -34,10 +34,6 @@ template<class Scalar> using DeviceVector = Eigen::Matrix<Scalar, Eigen::Dynamic
 
 #elif defined( USE_MINLIN )
 
-#if defined(DEBUG)
-#define MINLIN_DEBUG 1
-#endif
-
 #define GET_COLUMN( VARIABLE, COLUMN_NR )  VARIABLE(all,COLUMN_NR)
 #define GET_POINTER( VARIABLE )            VARIABLE.pointer()
 #define GET_NORM( VARIABLE )               minlin::norm( VARIABLE )

@@ -12,6 +12,11 @@ set(MKL_INCLUDE_DIR $ENV{MKLROOT}/include)
 include_directories(${MKL_INCLUDE_DIR})
 link_directories($ENV{MKLROOT}/lib/intel64)
 
+# add debug definitions to compiler flags
+#IF(CMAKE_BUILD_TYPE MATCHES DEBUG)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
+#ENDIF(CMAKE_BUILD_TYPE MATCHES DEBUG)
+
 # eigen include location and defines
 set(EIGEN_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/eigen)
 set(EIGEN_DEFS USE_EIGEN)
@@ -60,9 +65,10 @@ include(FindCUDA)
 set(CUDA_PROPAGATE_HOST_FLAGS off) # if flags are passed with -Xcompiler, they also affect NVCC which doesn't understand all g++ flags we use
 set(CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER}) # without this, cc is used instead of CC and all include paths have to be specified manually
 string(REPLACE "-std=c++11" "" CUDA_CXX_FLAGS ${CMAKE_CXX_FLAGS}) # remove C++11 from options
-set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} ${MINLIN_DEVICE_DEFS} -arch=sm_35 --compiler-options \"${CUDA_CXX_FLAGS} -Wno-vla\"")
 cuda_include_directories(${MINLIN_INCLUDE})
-cuda_add_executable(minlin_device src/usi_compression.cu)
+cuda_add_executable(minlin_device src/usi_compression.cu
+	OPTIONS "${MINLIN_DEVICE_DEFS} -arch=sm_35 --compiler-options \"${CUDA_CXX_FLAGS} -Wno-vla\""
+	DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
 target_link_libraries(minlin_device mkl_core mkl_gnu_thread mkl_rt boost_program_options cublas)
 set_target_properties(minlin_device PROPERTIES
 	OUTPUT_NAME usi_compression_minlin_device

@@ -138,12 +138,13 @@ private:
       // determine X column means for each active state denoted by gamma_ind
       update_cluster_means(X);
       
+#if defined(DEBUG)
       // we calculate the L value here for output only
-      // TODO: remove this for optimization later
       L_value_new =  L_norm(X, TT);
       if (!my_rank_) std::cout << "L value after Theta calc " << L_value_new << std::endl;
       // Not clear if there should be monotonic decrease here
       // new theta_s needs new TT, right?
+#endif
       
       // Principle Component Analysis for every cluster
       for(int k = 0; k < K_; k++) {
@@ -157,10 +158,11 @@ private:
         bool success = lanczos_correlation(X_translated, 1, (Scalar) 1.0e-11, 50, TT[k], true);
       }
 
+#if defined(DEBUG)
       // we calculate the L value here for output only
-      // TODO: remove this for optimization later
       L_value_new = L_norm(X, TT);
       if (!my_rank_) std::cout << "L value after PCA " << L_value_new << std::endl;
+#endif
       
       // find new optimal clustering
       update_clustering(X, TT);
