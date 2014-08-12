@@ -1,3 +1,20 @@
+/** \file lanczos_correlation_minlin.h
+ *
+ *  This file contains the minlin implementation of the Lanczos algorithm for
+ *  a correlation matrix as well as a wrapper around the LAPACK eigensolver.
+ *
+ *  \copyright Copyright (c) 2014,
+ *             Universita della Svizzera italiana (USI) &
+ *             Centro Svizzero di Calcolo Scientifico (CSCS).
+ *             All rights reserved.
+ *             This software may be modified and distributed under the terms
+ *             of the BSD license. See the LICENSE file for details.
+ *
+ *  \author Will Sawyer (CSCS)
+ *  \author Ben Cumming (CSCS)
+ *  \author Manuel Schmid (CSCS)
+ */
+
 #pragma once
 #include <cstdlib>   // std::abs
 #include <algorithm> // std::copy, std::max

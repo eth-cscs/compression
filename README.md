@@ -93,3 +93,13 @@ Requirements
   data files. We do not specify include or library paths so they should be
   provided by the 'cray-netcdf-hdf5parallel' and 'cray-hdf5-parallel' modules.
 * Standard C++ library: We use several parts of the standard library.
+
+
+License
+-------
+Copyright (c) 2014, Università della Svizzera italiana (USI) & Centro Svizzero di Calcolo Scientifico (CSCS)
+All rights reserved.
+
+This software may be modified and distributed under the terms of the BSD license. See the [LICENSE.md] file for details.
+
+The Eigen and minlin projects are subject to their respective licensing conditions.

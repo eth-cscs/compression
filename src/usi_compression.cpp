@@ -1,4 +1,27 @@
+/** \file usi_compression.cpp
+ *
+ *  Compression of NetCDF data based on an algorithm developped by Prof. Illia
+ *  Horenko at Universita della Svizzera italiana (USI).
+ *
+ *  Reference:
+ *  Horenko, Klein, Dolaptchiev, Schuette
+ *  Automated Generation of Reduced Stochastic Weather Models I:
+ *  simultaneous dimension and model reduction for time series analysis
+ *
+ *  \copyright Copyright (c) 2014,
+ *             Universita della Svizzera italiana (USI) &
+ *             Centro Svizzero di Calcolo Scientifico (CSCS).
+ *             All rights reserved.
+ *             This software may be modified and distributed under the terms
+ *             of the BSD license. See the LICENSE file for details.
+ *
+ *  \author Will Sawyer (CSCS)
+ *  \author Ben Cumming (CSCS)
+ *  \author Manuel Schmid (CSCS)
+ */
+
 #define VERSION 0.1
+
 #define KSIZE 10 // default number of clusters
 #define MSIZE 5  // default number of eigenvectors used in final compression
 
@@ -19,64 +42,8 @@ typedef double Scalar;     // feel free to change this to 'double' if supported 
 #include "NetCDFInterface.h"
 #include "CompressedMatrix.h"
 
-/**
-	   Write description of function here.
-	   The function should follow these comments.
-	   Use of "brief" tag is optional. (no point to it)
-	   
-	   The function arguments listed with "param" will be compared
-	   to the declaration and verified.
-	 
-	   @param[in]     filename    Filename (string)
-	   @param[in]     fields      List of the fields to be extracted (vector of strings0
-	   @return                    vector of concatenated field values
-	 */
 
-
-
-
-int main(int argc, char *argv[])
-//****************************************************************************80
-//
-//  Purpose:
-//
-//    Example of parallel NetCDF functionality
-//
-//  Discussion:
-//
-//    This program demonstrates parallel NetCDF functionality.  It reads from
-//    a NetCDF file a specified, specified as the first and second arguments of
-//    the function.  
-//
-//    This is the first step toward implementing a compression backend which 
-//    reads a NetCDF stream, and compresses the time series data in parallel
-//    using the approaches of Horenko, et al.
-//
-//  Licensing:
-//
-//    This code is distributed under the GNU LGPL license. 
-//
-//  Modified:
-//
-//     Starting October 2013
-//
-//  Author:
-//
-//    William Sawyer (CSCS)
-//    Ben Cumming (CSCS)
-//
-//  Reference:
-//    
-//    Horenko, Klein, Dolaptchiev, Schuette
-//    Automated Generation of Reduced Stochastic Weather Models I:
-//    simultaneous dimension and model reduction for time series analysis
-//    XXX  
-//
-//  Example execution:
-//
-//    aprun -n 2 ./netcdf_get_data /project/csstaff/outputs/echam/echam6/echam_output/t31_196001.01_echam.nc seaice
-//
-{
+int main(int argc, char *argv[]) {
 
   //
   //  Initialize MPI

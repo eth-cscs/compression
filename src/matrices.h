@@ -1,3 +1,22 @@
+/** \file matrices.h
+ *
+ *  This file contains type definitions for matrices and vectors depending
+ *  on whether Eigen or minlin is used as a linear algebra backend.
+ *  It also contains a wrapper around the tger BLAS function that isn't
+ *  supported by minlin yet.
+ *
+ *  \copyright Copyright (c) 2014,
+ *             Universita della Svizzera italiana (USI) &
+ *             Centro Svizzero di Calcolo Scientifico (CSCS).
+ *             All rights reserved.
+ *             This software may be modified and distributed under the terms
+ *             of the BSD license. See the LICENSE file for details.
+ *
+ *  \author Will Sawyer (CSCS)
+ *  \author Ben Cumming (CSCS)
+ *  \author Manuel Schmid (CSCS)
+ */
+
 #pragma once
 
 #if defined( USE_EIGEN )

@@ -1,3 +1,19 @@
+/** \file NetCDFInterface.h
+ *
+ *  This file defines the templated class NetCDFInterfacetype.
+ *
+ *  \copyright Copyright (c) 2014,
+ *             Universita della Svizzera italiana (USI) &
+ *             Centro Svizzero di Calcolo Scientifico (CSCS).
+ *             All rights reserved.
+ *             This software may be modified and distributed under the terms
+ *             of the BSD license. See the LICENSE file for details.
+ *
+ *  \author Will Sawyer (CSCS)
+ *  \author Ben Cumming (CSCS)
+ *  \author Manuel Schmid (CSCS)
+ */
+
 #pragma once
 #include <iostream> // std::cout, std::endl
 #include <string>   // std::string
