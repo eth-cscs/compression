@@ -56,7 +56,7 @@ cd build
 cmake ..
 
 # load the required modules on CSCS systems (may not work on other systems)
-module load ../util/module_usi_compression
+module load ../util/usi_compression_module
 
 make                   # this builds all variants, alternatively select only
                        # one variant with 'make eigen', 'make minlin_host' or
