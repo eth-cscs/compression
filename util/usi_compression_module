@@ -5,15 +5,19 @@
 
 # load modules
 module swap PrgEnv-cray PrgEnv-gnu
-module load boost # we only use the program_options component
-module load cudatoolkit # used for thrust
+# we only use the program_options component of boost
+module load boost
+# we use thrust from cudatoolkit
+module load cudatoolkit
 module load cmake
 module load craype-accel-nvidia35
 module load cray-netcdf-hdf5parallel
 module load cray-hdf5-parallel
 module load cray-mpich
-module swap gcc/4.8.2 # nvcc doesn't work with 4.9
-module load intel # needed for mkl (we use $MKLROOT)
+# nvcc doesn't work with gcc 4.9, so we load 4.8.2
+module swap gcc/4.8.2
+# we need the intel module for mkl (we use $MKLROOT)
+module load intel
 
 # add ld library path
 prepend-path LD_LIBRARY_PATH /opt/intel/14.0.1.106/composer_xe_2013_sp1.1.106/mkl/lib/intel64
