@@ -97,9 +97,9 @@ Requirements
 
 License
 -------
-Copyright (c) 2014, Università della Svizzera italiana (USI) & Centro Svizzero di Calcolo Scientifico (CSCS)
+Copyright (c) 2014, Università della Svizzera italiana (USI) & Centro Svizzero di Calcolo Scientifico (CSCS)  
 All rights reserved.
 
-This software may be modified and distributed under the terms of the BSD license. See the [LICENSE.md] file for details.
+This software may be modified and distributed under the terms of the BSD license. See the [LICENSE file](LICENSE.md) for details.
 
 The Eigen and minlin projects are subject to their respective licensing conditions.
