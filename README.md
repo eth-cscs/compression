@@ -15,7 +15,7 @@ other two use [minlin](https://github.com/bcumming/minlin) with either OpenMP
 or CUDA for the computations. The usage is identical for all variants.
 
 ```
-usi_compression_VARIANT INPUT_DATA [OPTIONS]
+usi_compression_VARIANT INPUT_FILE [OPTIONS]
 
 Options:
 --help              Display a usage message and exit.
@@ -35,6 +35,9 @@ Options:
                     compressed dimension if multiple variables are selected.
                     By specifying this option, this can be changed to stacking
                     the variables along the distributed (horizontal) dimensions.
+-o, --output-file   The path to the file where the reconstructed data is written.
+                    default: INPUT_FILE_reconstructed.nc4
+-a, --append        The data is appended to the output file instead of overwriting it.
 ```
 
 

@@ -63,6 +63,7 @@ int main(int argc, char *argv[]) {
 
   int M_size, K_size;
   std::string filename;
+  std::string filename_out;
   std::vector<std::string> variables;
   std::vector<std::string> compressed_dims;
   std::vector<std::string> distributed_dims;
@@ -90,6 +91,10 @@ int main(int argc, char *argv[]) {
     ("horizontal-stacking,h", "stack variables in distributed (horizontal) instead of compressed (vertical) direction")
     ("file", po::value<std::string>(&filename)->required(),
         "the path to the NetCDF4 file")
+    ("output-file,o", po::value<std::string>(&filename_out)
+        ->default_value(std::string(), "FILE_reconstructed.nc4"),
+        "the path to the NetCDF4 output file")
+    ("append,a", "append reconstructed variables to output file instead of overwriting it")
     ("variables,v", po::value< std::vector<std::string> >(&variables)->required()->multitoken(),
         "the variable that is to be compressed")
     ;
@@ -99,6 +104,11 @@ int main(int argc, char *argv[]) {
   po::variables_map po_vm;
   po::store(po::command_line_parser(argc, argv).options(po_description)
       .positional(po_positional).run(), po_vm);
+
+  bool append = false;
+  if (po_vm.count("append")) {
+    append = true;
+  }
 
   if (po_vm.count("help")) {
     if (!my_rank) std::cout << po_description << std::endl;
@@ -183,7 +193,7 @@ int main(int argc, char *argv[]) {
   // Write Reconstructed Data to File
   //
 
-  netcdf_interface.write_matrix(X_reconstructed);
+  netcdf_interface.write_matrix(X_reconstructed, filename_out, append);
 
 
   //

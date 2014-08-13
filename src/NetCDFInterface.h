@@ -61,15 +61,17 @@ public:
   }
 
 
-  void write_matrix(DeviceMatrix<Scalar> input) {
+  void write_matrix(DeviceMatrix<Scalar> input, std::string filename_out = "",
+      bool append = false) {
 
-    std::string filename_out = filename_.substr(0,filename_.length()-4)
-        + "_reconstructed.nc4";
+    if (filename_out.empty()) filename_out =
+        filename_.substr(0,filename_.length()-4) + "_reconstructed.nc4";
+    if (!my_rank_) std::cout << "Writing data to file " << filename_out << std::endl;
 
     HostMatrix<Scalar> data = input; // copy to host
     std::vector< HostVector<Scalar> > recomposed_data = recompose_data(data);
     // only the first process creates the new file
-    if (!my_rank_) setup_output_file(filename_out);
+    if (!my_rank_) setup_output_file(filename_out, append);
     // only continue after file has been created
     MPI_Barrier(MPI_COMM_WORLD);
     write_data(filename_out, recomposed_data);
@@ -79,7 +81,7 @@ public:
 
   void close() {
     if ((r_ = nc_close(netcdf_id_))) ERR(r_);
-    if (!my_rank_) std::cout << "NetCDF file closed." << std::endl;
+    if (!my_rank_) std::cout << "NetCDF file closed" << std::endl;
   }
 
 
@@ -535,14 +537,23 @@ private:
   }
 
 
-  void setup_output_file(std::string filename_out) {
+  void setup_output_file(std::string filename_out, bool append) {
     /* This creates a new file 'filename' with all the dimensions and
      * variables that have been read from the original input file. */
 
     // NetCDF: create new file, overwriting if it already exists
     int netcdf_id_out;
-    if ((r_ = nc_create(filename_out.c_str(), NC_CLOBBER|NC_NETCDF4,
-            &netcdf_id_out))) ERR(r_);
+    if (append) {
+      // NetCDF: open file in write mode
+      if ((r_ = nc_open(filename_out.c_str(), NC_WRITE,
+              &netcdf_id_out))) ERR(r_);
+      // NetCDF: place file in define mode
+      if ((r_ = nc_redef(netcdf_id_out))) ERR(r_);
+    } else {
+      // NetCDF: create new file, overwriting if it already exists
+      if ((r_ = nc_create(filename_out.c_str(), NC_CLOBBER|NC_NETCDF4,
+              &netcdf_id_out))) ERR(r_);
+    }
 
     // create dimensions & variables
     std::map<int, int> dimension_map = create_all_dimensions(netcdf_id_out);
@@ -551,7 +562,12 @@ private:
     // NetCDF: end define mode and close output file
     if ((r_ = nc_enddef(netcdf_id_out))) ERR(r_);
     if ((r_ = nc_close(netcdf_id_out))) ERR(r_);
-    std::cout << "NetCDF output file created" << std::endl;
+
+    if (append) {
+      std::cout << "Existing NetCDF file opened for output" << std::endl;
+    } else {
+      std::cout << "NetCDF output file created" << std::endl;
+    }
   }
 
 
@@ -581,9 +597,19 @@ private:
       size_t dim_length;
       // NetCDF: get name and length for each dimension
       if ((r_ = nc_inq_dim(netcdf_id_, *dim, dim_name, &dim_length))) ERR(r_);
+
       int dim_id;
-      // NetCDF: write name and length for each dimension
-      if ((r_ = nc_def_dim(netcdf_id_out, dim_name, dim_length, &dim_id))) ERR(r_);
+      // check whether dimension exists already (i.e. when we are appending)
+      int nc_return = nc_inq_dimid(netcdf_id_out, dim_name, &dim_id);
+      if (nc_return) {
+        if (nc_return == NC_EBADDIM) { // the dimension doesn't exist yet
+          // NetCDF: write name and length for each dimension
+          if ((r_ = nc_def_dim(netcdf_id_out, dim_name, dim_length, &dim_id))) ERR(r_);
+        } else {
+          ERR(nc_return);
+        }
+      }
+
       dim_map[*dim] = dim_id;
     }
 
