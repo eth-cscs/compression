@@ -41,6 +41,7 @@ typedef double Scalar;     // feel free to change this to 'double' if supported 
 #include "matrices.h"
 #include "NetCDFInterface.h"
 #include "CompressedMatrix.h"
+#include "matrix_statistics.h"
 
 
 int main(int argc, char *argv[]) {
@@ -78,6 +79,7 @@ int main(int argc, char *argv[]) {
   po_description.add_options()
     ("help", "display this help message")
     ("version", "display the version number")
+    ("statistics,s", "print out statistics about the compression at the end")
     ("compressed,c", po::value< std::vector<std::string> >(&compressed_dims)
         ->default_value(default_compressed_dims, "lon,lat")->multitoken(), 
         "list of compressed dimensions")
@@ -154,39 +156,47 @@ int main(int argc, char *argv[]) {
 
 
   //
-  // Reconstruct Matrix & Measure Difference
+  // Reconstruct Matrix
   //
 
   DeviceMatrix<Scalar> X_reconstructed = X_compressed.reconstruct();
-  DeviceMatrix<Scalar> X_difference = X_reconstructed - X;
-
-  Scalar column_norm;
-  Scalar local_square_norm = 0.0;
-  Scalar global_square_norm = 0.0;
-  for (int i = 0; i < X_difference.cols(); i++ ) {
-    column_norm = GET_NORM(GET_COLUMN(X_difference, i));
-    local_square_norm += column_norm * column_norm;
-  }
-  MPI_Allreduce( &local_square_norm, &global_square_norm, 1, mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD );
 
 
   //
   // Statistics Output
   //
 
-  double time_for_solve = time_after_compression -  time_after_reading_data;
-  double time_for_input = time_after_reading_data - time_at_start;
-  
-  double max_time_for_solve, max_time_for_input;
-  MPI_Allreduce( &time_for_solve, &max_time_for_solve, 1, mpi_type_helper<Scalar>::value, MPI_MAX, MPI_COMM_WORLD );
-  MPI_Allreduce( &time_for_input, &max_time_for_input, 1, mpi_type_helper<Scalar>::value, MPI_MAX, MPI_COMM_WORLD );
+  if (po_vm.count("statistics")) {
 
-  if (!my_rank) std::cout << "Max time for input " << max_time_for_input << std::endl;
-  if (!my_rank) std::cout << "Max time for solve " << max_time_for_solve << std::endl;
-  if (!my_rank) std::cout << "Compression ratio  " << 
-      X_compressed.original_size / (double) X_compressed.compressed_size
-      << std::endl;
-  if (!my_rank) std::cout << "Root mean square error " << sqrt( global_square_norm ) << std::endl;
+    // Title & upper border
+    if (!my_rank) std::cout << std::endl << std::setfill('-') << std::setw(80) << '-' << std::endl;
+    if (!my_rank) std::cout << " Statistics" << std::endl;
+    if (!my_rank) std::cout << std::setw(80) << '-' << std::setfill(' ') << std::endl << std::endl;
+
+    // Timing information
+    double time_for_solve = time_after_compression -  time_after_reading_data;
+    double time_for_input = time_after_reading_data - time_at_start;
+    double max_time_for_solve, max_time_for_input;
+    MPI_Allreduce( &time_for_solve, &max_time_for_solve, 1, mpi_type_helper<Scalar>::value, MPI_MAX, MPI_COMM_WORLD );
+    MPI_Allreduce( &time_for_input, &max_time_for_input, 1, mpi_type_helper<Scalar>::value, MPI_MAX, MPI_COMM_WORLD );
+    if (!my_rank) std::cout << " Maximum time for input: " << max_time_for_input << std::endl;
+    if (!my_rank) std::cout << " Maximum time for solve: " << max_time_for_solve << std::endl;
+    if (!my_rank) std::cout << std::endl;
+
+    // Compression ratio
+    if (!my_rank) std::cout << " Compression ratio: " <<
+        X_compressed.original_size / (double) X_compressed.compressed_size
+        << std::endl << std::endl;
+
+    // Matrix statistics
+    std::vector<int> row_start, row_count, col_start, col_count;
+    netcdf_interface.get_variable_ranges(row_start, row_count, col_start, col_count);
+    print_statistics(X, X_reconstructed, variables, row_start, row_count, col_start, col_count);
+
+    // Lower border
+    if (!my_rank) std::cout << std::setfill('-') << std::setw(80) << '-' <<
+        std::setfill(' ') << std::endl << std::endl;
+  }
 
 
   //

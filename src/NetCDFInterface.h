@@ -61,6 +61,36 @@ public:
   }
 
 
+  void get_variable_ranges(
+      std::vector<int> &row_start,
+      std::vector<int> &row_count,
+      std::vector<int> &col_start,
+      std::vector<int> &col_count) {
+
+    // setup new vectors
+    row_start = std::vector<int>(n_variables_);
+    row_count = std::vector<int>(n_variables_);
+    col_start = std::vector<int>(n_variables_);
+    col_count = std::vector<int>(n_variables_);
+
+    // fill in new vectors
+    int row = 0;
+    int col = 0;
+    for (int v = 0; v < n_variables_; v++) {
+      row_start[v] = row;
+      row_count[v] = variable_rows_[v];
+      col_start[v] = col;
+      col_count[v] = variable_cols_[v];
+
+      if (stacking_ == HORIZONTAL) {
+        col += variable_cols_[v];
+      } else {
+        row += variable_rows_[v];
+      }
+    }
+  }
+
+
   void write_matrix(DeviceMatrix<Scalar> input, std::string filename_out = "",
       bool append = false) {
 
