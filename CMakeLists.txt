@@ -4,7 +4,13 @@
 project(USI_COMPRESSION)
 cmake_minimum_required(VERSION 2.8)
 
+# set default build type
+if(NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE "Debug")
+endif()
+
 # set general g++ flags
+# note: we always need -O3 because minlin_host doesn't compile without it
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fopenmp -O3")
 
 # define variables for mkl include directories
@@ -13,9 +19,7 @@ include_directories(${MKL_INCLUDE_DIR})
 link_directories($ENV{MKLROOT}/lib/intel64)
 
 # add debug definitions to compiler flags
-#IF(CMAKE_BUILD_TYPE MATCHES DEBUG)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
-#ENDIF(CMAKE_BUILD_TYPE MATCHES DEBUG)
 
 # eigen include location and defines
 set(EIGEN_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/eigen)
@@ -64,10 +68,12 @@ set_target_properties(minlin_host PROPERTIES
 include(FindCUDA)
 set(CUDA_PROPAGATE_HOST_FLAGS off) # if flags are passed with -Xcompiler, they also affect NVCC which doesn't understand all g++ flags we use
 set(CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER}) # without this, cc is used instead of CC and all include paths have to be specified manually
-string(REPLACE "-std=c++11" "" CUDA_CXX_FLAGS ${CMAKE_CXX_FLAGS}) # remove C++11 from options
+string(TOUPPER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_UPPER)
+set(CUDA_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-vla ${CMAKE_CXX_FLAGS_${BUILD_TYPE_UPPER}}") # add flags specific to build type
+string(REPLACE "-std=c++11" "" CUDA_CXX_FLAGS ${CUDA_CXX_FLAGS}) # remove C++11 from options
 cuda_include_directories(${MINLIN_INCLUDE})
 cuda_add_executable(minlin_device src/usi_compression.cu
-	OPTIONS "${MINLIN_DEVICE_DEFS} -arch=sm_35 --compiler-options \"${CUDA_CXX_FLAGS} -Wno-vla\""
+	OPTIONS "${MINLIN_DEVICE_DEFS} -arch=sm_35 --compiler-options \"${CUDA_CXX_FLAGS}\""
 	DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
 target_link_libraries(minlin_device mkl_core mkl_gnu_thread mkl_rt boost_program_options cublas)
 set_target_properties(minlin_device PROPERTIES
