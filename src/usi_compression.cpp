@@ -185,7 +185,7 @@ int main(int argc, char *argv[]) {
 
     // Compression ratio
     if (!my_rank) std::cout << " Compression ratio: " <<
-        X_compressed.original_size / (double) X_compressed.compressed_size
+        X_compressed.compressed_size / (double) X_compressed.original_size
         << std::endl << std::endl;
 
     // Matrix statistics
