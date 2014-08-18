@@ -38,14 +38,14 @@ public:
   int original_size;
   int compressed_size;
 
-  CompressedMatrix(const DeviceMatrix<Scalar> &X, const int K, const int M) {
+  CompressedMatrix(const DeviceMatrix<Scalar> &X, const int K, const int M, std::vector<int> column_ids) {
 
     Nc_ = X.rows(); // number of entries along compressed direction
     Nd_ = X.cols(); // number of entries along distributed direction
     K_  = K;        // number of clusters
     M_  = M;        // number of eigenvectors per cluster
 
-    initialize_data();
+    initialize_data(column_ids);
     do_iterative_clustering(X);
     do_final_pca(X);
     calculate_reduced_form(X);
@@ -90,7 +90,7 @@ private:
   int mpi_processes_;
   int my_rank_;
 
-  void initialize_data() {
+  void initialize_data(std::vector<int> column_ids) {
     
     // collect number of columns each process has
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_processes_);
@@ -108,9 +108,7 @@ private:
     X_reduced_ = std::vector< DeviceMatrix<Scalar> >(K_, DeviceMatrix<Scalar>(M_, Nd_));
     
     // initialize clusters independent from number of processes
-    int cluster_start = 0;
-    for (int i=0; i<my_rank_; i++) cluster_start += Nd_global[i];
-    for (int i=0; i<Nd_; i++) cluster_indices_[i] = (cluster_start+i)%K_;
+    for (int i=0; i<Nd_; i++) cluster_indices_[i] = column_ids[i]%K_;
 
     // set up sizes
     original_size = Nc_ * Nd_total_;

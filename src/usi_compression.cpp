@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
   NetCDFInterface<Scalar> netcdf_interface(filename, variables,
       compressed_dims, indexed_dims, stacking);
   DeviceMatrix<Scalar> X = netcdf_interface.construct_matrix();
-  
+
   double time_after_reading_data = MPI_Wtime();
 
 
@@ -150,7 +150,8 @@ int main(int argc, char *argv[]) {
   // Compress Matrix
   //
 
-  CompressedMatrix<Scalar> X_compressed(X, K_size, M_size);
+  std::vector<int> col_ids = netcdf_interface.get_column_ids();
+  CompressedMatrix<Scalar> X_compressed(X, K_size, M_size, col_ids);
   
   double time_after_compression = MPI_Wtime();
 

@@ -48,6 +48,7 @@ public:
     initialize_data(variables, compressed_dims, indexed_dims);
     select_data_ranges();
     set_up_mapping();
+    calculate_matrix_dimensions();
   }
 
 
@@ -88,6 +89,49 @@ public:
         row += variable_rows_[v];
       }
     }
+  }
+
+
+  std::vector<int> get_column_ids() {
+
+    // setup new vector
+    std::vector<int> col_ids(n_cols_);
+
+    int counter = 0;
+
+    for (int v = 0; v < n_variables_; v++) {
+
+      int distributed_dims = distributed_dims_length_[v].size();
+
+      // set up dimension_indices
+      std::vector<int> dimension_indices(distributed_dims);
+      for (int d = 0; d < distributed_dims; d++) {
+        dimension_indices[d] = distributed_dims_start_[v][d];
+      }
+
+      for (int i = 0; i < variable_cols_[v]; i++) {
+
+        int id = 0;
+        int factor = 1; // TODO: better name
+
+
+        for (int d = distributed_dims - 1; d >= 0; d--) { // reverse iteration
+          if (dimension_indices[d] == distributed_dims_start_[v][d]
+              + distributed_dims_count_[v][d] && d > 0) {
+            dimension_indices[d] = distributed_dims_start_[v][d];
+            dimension_indices[d-1]++;
+          }
+          id += dimension_indices[d] * factor;
+          factor *= distributed_dims_length_[v][d];
+        }
+
+        col_ids[counter] = id;
+        counter++;
+        dimension_indices.back()++; // increment last dimension
+      }
+    }
+
+    return col_ids;
   }
 
 
@@ -139,12 +183,19 @@ private:
   std::vector<bool> variable_is_empty_;       // for each variable
   std::vector< std::vector<size_t> > start_;  // for each variable & dimension
   std::vector< std::vector<size_t> > count_;  // for each variable & dimension
+  std::vector< std::vector<size_t> > distributed_dims_start_;  // for each var.
+  std::vector< std::vector<size_t> > distributed_dims_count_;  // & distributed
+  std::vector< std::vector<size_t> > distributed_dims_length_; // dimension
 
   // initialized in set_up_mapping:
   std::vector<int> variable_rows_;            // for each variable
   std::vector<int> variable_cols_;            // for each variable
   std::vector< std::vector<int> > row_map_;   // for each variable & dimension
   std::vector< std::vector<int> > col_map_;   // for each variable & dimension
+
+  // initialized in calculate_matrix_dimensions:
+  int n_rows_;
+  int n_cols_;
 
 
   int nc_get_vara(int ncid, int varid, const size_t start[], const size_t
@@ -231,6 +282,9 @@ private:
     
     start_  = std::vector< std::vector<size_t> >(n_variables_);
     count_  = std::vector< std::vector<size_t> >(n_variables_);
+    distributed_dims_start_  = std::vector< std::vector<size_t> >(n_variables_);
+    distributed_dims_count_  = std::vector< std::vector<size_t> >(n_variables_);
+    distributed_dims_length_ = std::vector< std::vector<size_t> >(n_variables_);
 
     for (int v = 0; v < n_variables_; v++) {
 
@@ -242,6 +296,7 @@ private:
       count_[v] = std::vector<size_t>(variable_dims_[v]);
 
       std::vector<int> distributed_dims;
+      distributed_dims_length_[v] = std::vector<size_t>();
 
       // NetCDF: get the ids of all dimensions for the variable
       // we use the dim_ids vector as an array here
@@ -282,7 +337,7 @@ private:
           // we only collect the distributed dimensions and their length in
           // this loop and treat them separately afterwards
           distributed_dims.push_back(d);
-          count_[v][d] = dim_length; // will be changed afterwards
+          distributed_dims_length_[v].push_back(dim_length);
           if (!my_rank_) std::cout << "  " << dim_name
               << " (distributed, " << dim_length << " entries)" << std::endl;
         }
@@ -317,10 +372,14 @@ private:
     std::vector<int> process_distribution =
         get_process_distribution(distributed_dims.size());
 
+    int n_dims = distributed_dims.size();
+    distributed_dims_start_[variable] = std::vector<size_t>(n_dims);
+    distributed_dims_count_[variable] = std::vector<size_t>(n_dims);
+
     int r = my_rank_;        // needed for calculating index along dimension
     int p = mpi_processes_;  // needed for calculating index along dimension
 
-    for (int i = 0; i < distributed_dims.size(); i++) {
+    for (int i = 0; i < n_dims; i++) {
 
       // In order to split the data between the processes, each process needs
       // to be assigned a unique index along each distributed dimension. This
@@ -351,7 +410,7 @@ private:
       int dim_index = r / p;
       r %= p;
 
-      int dim_length = count_[variable][distributed_dims[i]];
+      int dim_length = distributed_dims_length_[variable][i];
       int size_along_dim = dim_length / process_distribution[i];
 
       start_[variable][distributed_dims[i]] = dim_index * size_along_dim;
@@ -362,6 +421,11 @@ private:
         count_[variable][distributed_dims[i]] += dim_length
           % process_distribution[i];
       }
+
+      // we keep separate lists with the start/count of the distributed
+      // dimensions only
+      distributed_dims_start_[variable][i] = start_[variable][distributed_dims[i]];
+      distributed_dims_count_[variable][i] = count_[variable][distributed_dims[i]];
 
     }
   }
@@ -445,6 +509,21 @@ private:
   }
 
 
+  void calculate_matrix_dimensions() {
+    n_rows_ = variable_rows_[0];
+    n_cols_ = variable_cols_[0];
+    for (int v = 1; v < n_variables_; v++) {
+      if (stacking_ == HORIZONTAL) {
+        assert(n_rows_ == variable_rows_[v]);
+        if (!variable_is_empty_[v]) n_cols_ += variable_cols_[v];
+      } else {
+        assert(n_cols_ == variable_cols_[v]);
+        n_rows_ += variable_rows_[v];
+      }
+    }
+  }
+
+
   std::vector< HostVector<Scalar> > read_data() {
 
     std::vector< HostVector<Scalar> > output(n_variables_);
@@ -463,19 +542,7 @@ private:
 
   HostMatrix<Scalar> restructure_data(std::vector< HostVector<Scalar> > &data) {
 
-    int output_row_size = variable_rows_[0];
-    int output_col_size = variable_cols_[0];
-    for (int v = 1; v < n_variables_; v++) {
-      if (stacking_ == HORIZONTAL) {
-        assert(output_row_size == variable_rows_[v]);
-        if (!variable_is_empty_[v]) output_col_size += variable_cols_[v];
-      } else {
-        assert(output_col_size == variable_cols_[v]);
-        output_row_size += variable_rows_[v];
-      }
-    }
-
-    HostMatrix<Scalar> output(output_row_size, output_col_size);
+    HostMatrix<Scalar> output(n_rows_, n_cols_);
 
     int row_offset = 0;
     int col_offset = 0;
