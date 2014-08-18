@@ -3,8 +3,9 @@
 #include <cmath>
 #include <iostream>
 #include <iomanip>
+#include <limits>
 
-using namespace std; // we dump the namespace because we need it extensively
+using namespace std; // we dump the namespace because we use it extensively
 
 
 
@@ -30,20 +31,31 @@ void print_statistics(const DeviceMatrix<Scalar> &X_original,
 
     int local_count = row_count[v] * col_count[v];
 
-    Scalar local_min_original = min(X_original(rs, re, cs, ce));
-    Scalar local_max_original = max(X_original(rs, re, cs, ce));
-    Scalar local_sum_original = sum(X_original(rs, re, cs, ce));
+    // initialize local variables to values that do not contribute
+    // to global values if the current process has no data for a
+    // variable
+    Scalar local_min_original = std::numeric_limits<Scalar>::max();
+    Scalar local_max_original = - std::numeric_limits<Scalar>::max();
+    Scalar local_sum_original = 0.0;
+    Scalar local_min_reconstructed = std::numeric_limits<Scalar>::max();
+    Scalar local_max_reconstructed = - std::numeric_limits<Scalar>::max();
+    Scalar local_sum_reconstructed = 0.0;
+    Scalar local_max_absolute_error = 0.0;
+    Scalar local_square_error_sum = 0.0;
 
-    Scalar local_min_reconstructed = min(X_reconstructed(rs, re, cs, ce));
-    Scalar local_max_reconstructed = max(X_reconstructed(rs, re, cs, ce));
-    Scalar local_sum_reconstructed = sum(X_reconstructed(rs, re, cs, ce));
-
-    Scalar local_max_absolute_error = max(abs(X_reconstructed(rs, re, cs, ce)
-          - X_original(rs, re, cs, ce)));
-    Scalar local_square_error_sum = sum(mul((X_reconstructed(rs, re, cs, ce)
-          - X_original(rs, re, cs, ce)), (X_reconstructed(rs, re, cs, ce)
-          - X_original(rs, re, cs, ce))));
-
+    if (local_count) {
+      local_min_original = min(X_original(rs, re, cs, ce));
+      local_max_original = max(X_original(rs, re, cs, ce));
+      local_sum_original = sum(X_original(rs, re, cs, ce));
+      local_min_reconstructed = min(X_reconstructed(rs, re, cs, ce));
+      local_max_reconstructed = max(X_reconstructed(rs, re, cs, ce));
+      local_sum_reconstructed = sum(X_reconstructed(rs, re, cs, ce));
+      local_max_absolute_error = max(abs(X_reconstructed(rs, re, cs, ce)
+            - X_original(rs, re, cs, ce)));
+      local_square_error_sum = sum(mul((X_reconstructed(rs, re, cs, ce)
+            - X_original(rs, re, cs, ce)), (X_reconstructed(rs, re, cs, ce)
+            - X_original(rs, re, cs, ce))));
+    }
 
     // initialize global variables
     int count;
@@ -88,17 +100,28 @@ void print_statistics(const DeviceMatrix<Scalar> &X_original,
     Scalar original_range = max_original - min_original;
 
 
+    // initialize local variables to values that do not contribute
+    // to global values if the current process has no data for a
+    // variable
+    Scalar local_square_deviations_original = 0.0;
+    Scalar local_square_deviations_reconstructed = 0.0;
+    Scalar local_multiplied_deviations = 0.0;
+
+
     // calculate values depending on mean
     // (x-x_mean)^2, (y-y_mean)^2, (x-x_mean)*(y-y_mean)
-    Scalar local_square_deviations_original = sum(mul(
-        (X_original(rs, re, cs, ce) - mean_original),
-        (X_original(rs, re, cs, ce) - mean_original)));
-    Scalar local_square_deviations_reconstructed = sum(mul(
-        (X_reconstructed(rs, re, cs, ce) - mean_reconstructed),
-        (X_reconstructed(rs, re, cs, ce) - mean_reconstructed)));
-    Scalar local_multiplied_deviations = sum(mul(
-        (X_original(rs, re, cs, ce) - mean_original),
-        (X_reconstructed(rs, re, cs, ce) - mean_reconstructed)));
+    if (local_count) {
+      local_square_deviations_original = sum(mul(
+          (X_original(rs, re, cs, ce) - mean_original),
+          (X_original(rs, re, cs, ce) - mean_original)));
+      local_square_deviations_reconstructed = sum(mul(
+          (X_reconstructed(rs, re, cs, ce) - mean_reconstructed),
+          (X_reconstructed(rs, re, cs, ce) - mean_reconstructed)));
+      local_multiplied_deviations = sum(mul(
+          (X_original(rs, re, cs, ce) - mean_original),
+          (X_reconstructed(rs, re, cs, ce) - mean_reconstructed)));
+    }
+
 
     Scalar square_deviations_original;
     Scalar square_deviations_reconstructed;
