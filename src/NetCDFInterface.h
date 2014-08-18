@@ -129,8 +129,12 @@ public:
         counter++;
         dimension_indices.back()++; // increment last dimension
       }
-    }
 
+      // for vertical stacking, we stop after one variable
+      if (stacking_ == VERTICAL) {
+        break;
+      }
+    }
     return col_ids;
   }
 
