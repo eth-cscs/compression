@@ -98,22 +98,25 @@ public:
     std::vector<int> col_ids(n_cols_);
 
     int counter = 0;
+    int offset = 0;
 
     for (int v = 0; v < n_variables_; v++) {
 
       int distributed_dims = distributed_dims_length_[v].size();
 
-      // set up dimension_indices
+      // set up dimension_indices and calculate # of columns of variable
+      int variable_cols = 1;
       std::vector<int> dimension_indices(distributed_dims);
       for (int d = 0; d < distributed_dims; d++) {
         dimension_indices[d] = distributed_dims_start_[v][d];
+        variable_cols *= distributed_dims_length_[v][d];
       }
 
+      // calculate all indices for the current variable
       for (int i = 0; i < variable_cols_[v]; i++) {
 
         int id = 0;
         int factor = 1; // TODO: better name
-
 
         for (int d = distributed_dims - 1; d >= 0; d--) { // reverse iteration
           if (dimension_indices[d] == distributed_dims_start_[v][d]
@@ -125,10 +128,13 @@ public:
           factor *= distributed_dims_length_[v][d];
         }
 
-        col_ids[counter] = id;
+        col_ids[counter] = id + offset;
         counter++;
         dimension_indices.back()++; // increment last dimension
       }
+
+      // increment offset for next variable
+      offset += variable_cols;
 
       // for vertical stacking, we stop after one variable
       if (stacking_ == VERTICAL) {
