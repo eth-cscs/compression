@@ -1,3 +1,20 @@
+/** \file matrix_statistics.h
+ *
+ *  This file defines a function to print out statistics about two matrices
+ *  containing data from multiple variables.
+ *
+ *  \copyright Copyright (c) 2014,
+ *             Universita della Svizzera italiana (USI) &
+ *             Centro Svizzero di Calcolo Scientifico (CSCS).
+ *             All rights reserved.
+ *             This software may be modified and distributed under the terms
+ *             of the BSD license. See the LICENSE file for details.
+ *
+ *  \author Will Sawyer (CSCS)
+ *  \author Ben Cumming (CSCS)
+ *  \author Manuel Schmid (CSCS)
+ */
+
 #pragma once
 #include <vector>
 #include <cmath>
