@@ -25,9 +25,11 @@ void print_statistics(const DeviceMatrix<Scalar> &X_original,
 
     // collect local information
     int rs = row_start[v];
-    int re = rs + row_count[v] - 1;
+    int rc = row_count[v];
+    int re = rs + rc - 1;
     int cs = col_start[v];
-    int ce = cs + col_count[v] - 1;
+    int cc = col_count[v];
+    int ce = cs + cc - 1;
 
     int local_count = row_count[v] * col_count[v];
 
@@ -44,6 +46,18 @@ void print_statistics(const DeviceMatrix<Scalar> &X_original,
     Scalar local_square_error_sum = 0.0;
 
     if (local_count) {
+#if defined(USE_EIGEN)
+      local_min_original = X_original.block(rs,cs,rc,cc).minCoeff();
+      local_max_original = X_original.block(rs,cs,rc,cc).maxCoeff();
+      local_sum_original = X_original.block(rs,cs,rc,cc).sum();
+      local_min_reconstructed = X_reconstructed.block(rs,cs,rc,cc).minCoeff();
+      local_max_reconstructed = X_reconstructed.block(rs,cs,rc,cc).maxCoeff();
+      local_sum_reconstructed = X_reconstructed.block(rs,cs,rc,cc).sum();
+      local_max_absolute_error = ( X_reconstructed.block(rs,cs,rc,cc)
+          - X_original.block(rs,cs,rc,cc) ).cwiseAbs().maxCoeff();
+      local_square_error_sum = ( X_reconstructed.block(rs,cs,rc,cc)
+          - X_original.block(rs,cs,rc,cc) ).squaredNorm();
+#elif defined(USE_MINLIN)
       local_min_original = min(X_original(rs, re, cs, ce));
       local_max_original = max(X_original(rs, re, cs, ce));
       local_sum_original = sum(X_original(rs, re, cs, ce));
@@ -55,6 +69,7 @@ void print_statistics(const DeviceMatrix<Scalar> &X_original,
       local_square_error_sum = sum(mul((X_reconstructed(rs, re, cs, ce)
             - X_original(rs, re, cs, ce)), (X_reconstructed(rs, re, cs, ce)
             - X_original(rs, re, cs, ce))));
+#endif
     }
 
     // initialize global variables
@@ -111,6 +126,17 @@ void print_statistics(const DeviceMatrix<Scalar> &X_original,
     // calculate values depending on mean
     // (x-x_mean)^2, (y-y_mean)^2, (x-x_mean)*(y-y_mean)
     if (local_count) {
+#if defined(USE_EIGEN)
+      local_square_deviations_original =
+        ( (X_original.block(rs,cs,rc,cc).array() - mean_original)
+        * (X_original.block(rs,cs,rc,cc).array() - mean_original) ).sum();
+      local_square_deviations_reconstructed =
+        ( (X_reconstructed.block(rs,cs,rc,cc).array() - mean_reconstructed)
+        * (X_reconstructed.block(rs,cs,rc,cc).array() - mean_reconstructed) ).sum();
+      local_multiplied_deviations =
+        ( (X_original.block(rs,cs,rc,cc).array() - mean_original)
+        * (X_reconstructed.block(rs,cs,rc,cc).array() - mean_reconstructed) ).sum();
+#elif defined(USE_MINLIN)
       local_square_deviations_original = sum(mul(
           (X_original(rs, re, cs, ce) - mean_original),
           (X_original(rs, re, cs, ce) - mean_original)));
@@ -120,6 +146,7 @@ void print_statistics(const DeviceMatrix<Scalar> &X_original,
       local_multiplied_deviations = sum(mul(
           (X_original(rs, re, cs, ce) - mean_original),
           (X_reconstructed(rs, re, cs, ce) - mean_reconstructed)));
+#endif
     }
 
 
