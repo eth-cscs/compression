@@ -191,8 +191,11 @@ int main(int argc, char *argv[]) {
 
     // Matrix statistics
     std::vector<int> row_start, row_count, col_start, col_count;
+    std::vector<Scalar> variable_mean, variable_max;
     netcdf_interface.get_variable_ranges(row_start, row_count, col_start, col_count);
-    print_statistics(X, X_reconstructed, variables, row_start, row_count, col_start, col_count);
+    netcdf_interface.get_variable_transformation(variable_mean, variable_max);
+    print_statistics(X, X_reconstructed, variables, variable_mean,
+        variable_max, row_start, row_count, col_start, col_count);
 
     // Lower border
     if (!my_rank) std::cout << std::setfill('-') << std::setw(80) << '-' <<

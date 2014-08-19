@@ -55,6 +55,7 @@ public:
   DeviceMatrix<Scalar> construct_matrix() {
 
     std::vector< HostVector<Scalar> > data = read_data();
+    normalize_data(data);
     HostMatrix<Scalar> restructured_data = restructure_data(data);
     DeviceMatrix<Scalar> output = restructured_data; // copy to device
 
@@ -89,6 +90,13 @@ public:
         row += variable_rows_[v];
       }
     }
+  }
+
+
+  void get_variable_transformation(std::vector<Scalar> &variable_mean,
+                                   std::vector<Scalar> &variable_max) {
+    variable_mean = variable_mean_;
+    variable_max  = variable_max_;
   }
 
 
@@ -154,6 +162,7 @@ public:
 
     HostMatrix<Scalar> data = input; // copy to host
     std::vector< HostVector<Scalar> > recomposed_data = recompose_data(data);
+    denormalize_data(recomposed_data);
     // only the first process creates the new file
     if (!my_rank_) setup_output_file(filename_out, append);
     // only continue after file has been created
@@ -206,6 +215,10 @@ private:
   // initialized in calculate_matrix_dimensions:
   int n_rows_;
   int n_cols_;
+
+  // initialized in normalize_data:
+  std::vector<Scalar> variable_mean_;         // for each variable
+  std::vector<Scalar> variable_max_;          // for each variable
 
 
   int nc_get_vara(int ncid, int varid, const size_t start[], const size_t
@@ -550,6 +563,61 @@ private:
   }
 
 
+  void normalize_data(std::vector< HostVector<Scalar> > &data) {
+
+    // initialize vectors
+    variable_mean_ = std::vector<Scalar>(n_variables_);
+    variable_max_  = std::vector<Scalar>(n_variables_);
+
+    for (int v = 0; v < n_variables_; v++) {
+
+      // find mean
+      int local_count = data[v].size();
+      int global_count;
+      MPI_Allreduce(&local_count, &global_count, 1,
+          MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+#if defined(USE_EIGEN)
+      Scalar local_sum = data[v].sum();
+#elif defined(USE_MINLIN)
+      Scalar local_sum = sum(data[v]);
+#endif
+      MPI_Allreduce(&local_sum, &variable_mean_[v], 1,
+          mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD);
+      variable_mean_[v] /= global_count;
+
+      // subtract mean
+#if defined(USE_EIGEN)
+      data[v] = data[v].array() - variable_mean_[v];
+#elif defined(USE_MINLIN)
+      data[v] -= variable_mean_[v];
+#endif
+
+      // find max abs value
+#if defined(USE_EIGEN)
+      Scalar local_max = data[v].cwiseAbs().maxCoeff();
+#elif defined(USE_MINLIN)
+      Scalar local_max = max(abs(data[v]));
+#endif
+      MPI_Allreduce(&local_max, &variable_max_[v], 1,
+          mpi_type_helper<Scalar>::value, MPI_MAX, MPI_COMM_WORLD);
+
+      // divide by max abs value
+      data[v] /= variable_max_[v];
+    }
+
+  }
+
+  void denormalize_data(std::vector< HostVector<Scalar> > &data) {
+    for (int v = 0; v < n_variables_; v++) {
+#if defined(USE_EIGEN)
+      data[v] = variable_mean_[v] + data[v].array() * variable_max_[v];
+#elif defined(USE_MINLIN)
+      data[v] = variable_mean_[v] + data[v] * variable_max_[v];
+#endif
+    }
+  }
+
+
   HostMatrix<Scalar> restructure_data(std::vector< HostVector<Scalar> > &data) {
 
     HostMatrix<Scalar> output(n_rows_, n_cols_);
@@ -579,6 +647,8 @@ private:
           output_row += dim_indicies[d] * row_map_[v][d];
           output_col += dim_indicies[d] * col_map_[v][d];
         }
+
+        // copy the data to the matrix, normalizing with the mean & max values
         output(output_row, output_col) = data[v](i);
 
         // increase index along last dimension for next iteration
