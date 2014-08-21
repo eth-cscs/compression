@@ -275,7 +275,7 @@ private:
         GET_COLUMN(X_translated, i) = GET_COLUMN(X, current_cluster_indices[i])
             - GET_COLUMN(cluster_means_, k);
       }
-      lanczos_correlation(X_translated, M_, (Scalar) 1.0e-8, Nc_, eigenvectors_[k], true);
+      lanczos_correlation(X_translated, M_, (Scalar) 1.0e-8, 50, eigenvectors_[k], true);
     }
     Scalar L_value_final = L_norm(X, eigenvectors_);
     if (!my_rank_) std::cout << "L value final " << L_value_final << std::endl;
