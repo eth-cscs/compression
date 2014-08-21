@@ -215,15 +215,18 @@ public:
 
     for (int v = 0; v < n_variables_; v++) {
 
+
       int distributed_dims = distributed_dims_length_[v].size();
 
       // set up dimension_indices and calculate # of columns of variable
-      int variable_cols = 1;
+      int variable_cols_global = 1;
       std::vector<int> dimension_indices(distributed_dims);
       for (int d = 0; d < distributed_dims; d++) {
         dimension_indices[d] = distributed_dims_start_[v][d];
-        variable_cols *= distributed_dims_length_[v][d];
+        variable_cols_global *= distributed_dims_length_[v][d];
       }
+
+      std::cout << "rank " << my_rank_ << ", variable " << v << ", total cols " << variable_cols_global << ", local cols " << variable_cols_[v] << std::endl;
 
       // calculate all indices for the current variable
       for (int i = 0; i < variable_cols_[v]; i++) {
@@ -243,11 +246,15 @@ public:
 
         col_ids[counter] = id + offset;
         counter++;
-        dimension_indices.back()++; // increment last dimension
+        // increment last dimension
+        // in the case where there are no distributed dimensions, one process
+        // gets one column with the data. in this case, dimension_indices has
+        // length 0 and we shouldn't attempt to increment the last element.
+        if (distributed_dims) dimension_indices.back()++;
       }
 
       // increment offset for next variable
-      offset += variable_cols;
+      offset += variable_cols_global;
 
       // for vertical stacking, we stop after one variable
       if (stacking_ == VERTICAL) {
@@ -357,8 +364,6 @@ private:
   ///@{
   /// \brief The number of dimensions, for each variable.
   std::vector<int> variable_dims_;
-  /// \brief Whether the current process has no data, for each variable.
-  std::vector<bool> variable_is_empty_;
   /// \brief The first index of the data that is read from the file, for each
   ///        variable & dimension.
   std::vector< std::vector<size_t> > start_;
@@ -524,16 +529,14 @@ private:
    * are only collected in this function and the entries in start_ and count_
    * are later filled in by calling calculate_distributed_dims_data_range().
    *
-   * It sets up the member variables #variable_dims_, #variable_is_empty_,
-   * #start_, #count_, #distributed_dims_start_, #distributed_dims_count_,
-   * and #distributed_dims_length_.
+   * It sets up the member variables #variable_dims_, #start_, #count_,
+   * #distributed_dims_start_, #distributed_dims_count_, and
+   * #distributed_dims_length_.
    */
   void select_data_ranges() {
-    /* This function sets up the internal variables start_ and count_. */
-    
+
     variable_dims_     = std::vector<int>(n_variables_);
-    variable_is_empty_ = std::vector<bool>(n_variables_, false);
-    
+
     start_  = std::vector< std::vector<size_t> >(n_variables_);
     count_  = std::vector< std::vector<size_t> >(n_variables_);
     distributed_dims_start_  = std::vector< std::vector<size_t> >(n_variables_);
@@ -600,17 +603,6 @@ private:
       // this adds in the correct data ranges for the distributed dimensions
       if (distributed_dims.size()) {
         calculate_distributed_dims_data_range(v, distributed_dims);
-      } else {
-        // for variables that have no dimensions in the distributed direction
-        // (this should only happen if they are stacked horizontally),
-        // all processes get the data (there is no count in the distributed
-        // direction as the variable doesn't have a dimension in this
-        // direction). we therefore have to assign it to one of the processes
-        // here. we can then skip this variable when we load the data into the
-        // output matrix in restructure_data().
-        assert(stacking_ == HORIZONTAL);
-        if (process_getting_more_data_ != my_rank_) variable_is_empty_[v] = true;
-        increment_process_getting_more_data();
       }
     }
   }
@@ -725,7 +717,8 @@ private:
    * between two consecutive elements along a dimension when they are written
    * to the matrix. This makes it fairly easy to calculate the row and column
    * for each value when the data is written to a matrix in the function
-   * restructure_data().
+   * restructure_data(). We also save the number of rows and columns for each
+   * variable as we need them later and they are calculated here anyway.
    *
    * It sets up the member variables #row_map_, #col_map_, #variable_rows_,
    * and #variable_cols_.
@@ -796,6 +789,19 @@ private:
       }
       variable_rows_[v] = row_interelement_distance;
       variable_cols_[v] = col_interelement_distance;
+
+      if (!distributed_dims_length_[v].size()) {
+        // for variables that have no dimensions in the distributed direction
+        // (this should only happen if they are stacked horizontally),
+        // all processes get the data by default (there is no count in the
+        // distributed direction as the variable doesn't have a dimension in
+        // this direction). we therefore assign it to one of the processes
+        // here. the data vectors will then have length 0 for all other
+        // processes and we skip them when we read or write the NetCDF file.
+        assert(stacking_ == HORIZONTAL);
+        if (process_getting_more_data_ != my_rank_) variable_cols_[v] = 0;
+        increment_process_getting_more_data();
+      }
     }
   }
 
@@ -811,7 +817,7 @@ private:
     for (int v = 1; v < n_variables_; v++) {
       if (stacking_ == HORIZONTAL) {
         assert(n_rows_ == variable_rows_[v]);
-        if (!variable_is_empty_[v]) n_cols_ += variable_cols_[v];
+        n_cols_ += variable_cols_[v];
       } else {
         assert(n_cols_ == variable_cols_[v]);
         n_rows_ += variable_rows_[v];
@@ -832,9 +838,13 @@ private:
 
     for (int v = 0; v < n_variables_; v++) {
       output[v] = HostVector<Scalar>(variable_rows_[v] * variable_cols_[v]);
-      // NetCDF: get data array for variable
-      if ((r_ = nc_get_vara(netcdf_id_, variable_ids_[v], &(start_[v][0]),
-              &(count_[v][0]), GET_POINTER(output[v])))) ERR(r_);
+      // avoid reading data if the variable has no data columns assigned to
+      // the current process
+      if (output[v].size()) {
+        // NetCDF: get data array for variable
+        if ((r_ = nc_get_vara(netcdf_id_, variable_ids_[v], &(start_[v][0]),
+                &(count_[v][0]), GET_POINTER(output[v])))) ERR(r_);
+      }
     }
 
     if (!my_rank_) std::cout << "Data read from NetCDF file" << std::endl;
@@ -865,33 +875,43 @@ private:
       int global_count;
       MPI_Allreduce(&local_count, &global_count, 1,
           MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+      Scalar local_sum = 0; // value that doesn't contribute to global sum
+      if (local_count) {
 #if defined(USE_EIGEN)
-      Scalar local_sum = data[v].sum();
+        local_sum = data[v].sum();
 #elif defined(USE_MINLIN)
-      Scalar local_sum = sum(data[v]);
+        local_sum = sum(data[v]);
 #endif
+      }
       MPI_Allreduce(&local_sum, &variable_mean_[v], 1,
           mpi_type_helper<Scalar>::value, MPI_SUM, MPI_COMM_WORLD);
       variable_mean_[v] /= global_count;
 
       // subtract mean
+      if (local_count) {
 #if defined(USE_EIGEN)
-      data[v] = data[v].array() - variable_mean_[v];
+        data[v] = data[v].array() - variable_mean_[v];
 #elif defined(USE_MINLIN)
-      data[v] -= variable_mean_[v];
+        data[v] -= variable_mean_[v];
 #endif
+      }
 
       // find max abs value
+      Scalar local_max = 0; // value that doesn't contribute to global max
+      if (local_count) {
 #if defined(USE_EIGEN)
-      Scalar local_max = data[v].cwiseAbs().maxCoeff();
+        local_max = data[v].cwiseAbs().maxCoeff();
 #elif defined(USE_MINLIN)
-      Scalar local_max = max(abs(data[v]));
+        local_max = max(abs(data[v]));
 #endif
+      }
       MPI_Allreduce(&local_max, &variable_max_[v], 1,
           mpi_type_helper<Scalar>::value, MPI_MAX, MPI_COMM_WORLD);
 
       // divide by max abs value
-      data[v] /= variable_max_[v];
+      if (local_count) {
+        data[v] /= variable_max_[v];
+      }
     }
 
   }
@@ -937,12 +957,6 @@ private:
     int row_offset = 0;
     int col_offset = 0;
     for (int v = 0; v < n_variables_; v++) {
-
-      // variables with no dimensions in distributed direction are detected
-      // and set at the end of select_data_ranges()
-      if (variable_is_empty_[v]) {
-        continue;
-      }
 
       std::vector<int> dim_indicies(variable_dims_[v], 0);
       for (int i = 0; i < data[v].size(); i++) {
@@ -993,12 +1007,6 @@ private:
     int row_offset = 0;
     int col_offset = 0;
     for (int v = 0; v < n_variables_; v++) {
-
-      // variables with no dimensions in distributed direction are detected
-      // and set at the end of select_data_ranges()
-      if (variable_is_empty_[v]) {
-        continue;
-      }
 
       output[v] = HostVector<Scalar>(variable_rows_[v] * variable_cols_[v]);
 
@@ -1142,7 +1150,7 @@ private:
    *                          library.
    * \param[in] dim_map       Map from the old dimension IDs to the new ones.
    */
-  void create_all_variables(int netcdf_id_out, const std::map<int, int> dim_map) {
+  void create_all_variables(int netcdf_id_out, std::map<int, int> dim_map) {
 
     for (int v = 0; v < n_variables_; v++) {
 
@@ -1186,11 +1194,13 @@ private:
     std::vector<int> new_variable_ids = get_new_variable_ids(netcdf_id_out);
 
     for (int v = 0; v < n_variables_; v++) {
-      if (variable_is_empty_[v]) continue;
 
-      // NetCDF: write data array for variable
-      if ((r_ = nc_put_vara(netcdf_id_out, new_variable_ids[v], &(start_[v][0]),
-              &(count_[v][0]), GET_POINTER(data[v])))) ERR(r_);
+      // some variables can have no data assigned to the current process
+      if (data[v].size()) {
+        // NetCDF: write data array for variable
+        if ((r_ = nc_put_vara(netcdf_id_out, new_variable_ids[v], &(start_[v][0]),
+                &(count_[v][0]), GET_POINTER(data[v])))) ERR(r_);
+      }
     }
 
     if ((r_ = nc_close(netcdf_id_out))) ERR(r_);
