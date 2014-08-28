@@ -48,6 +48,16 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
   assert(EV.cols() == ne);
   assert(N         >= max_iter);
 
+  // check whether the cluster is empty
+  int local_vectors = Xtranslated.cols();
+  int vectors_in_cluster;
+  MPI_Allreduce(&local_vectors, &vectors_in_cluster, 1, MPI_INT, MPI_SUM,
+      MPI_COMM_WORLD);
+  if (!vectors_in_cluster) {
+      std::cout << "WARNING: empty cluster skipped" << std::endl;
+      return false; // corresponds to success
+  }
+
   DeviceMatrix<Scalar> V(N,max_iter);  // transformation
 
   DeviceVector<Scalar> w(N);
