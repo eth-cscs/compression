@@ -19,6 +19,7 @@
 #include <iostream> // std::cout, std::endl
 #include <vector>   // std::vector
 #include <limits>   // std::numeric_limits
+#include <algorithm>// std::max
 #include <mpi.h>    // MPI_Comm_size, MPI_Comm_rank, MPI_Allreduce, MPI_Allgather
 #include "mpi_type_helper.h"
 #include "matrices.h"
@@ -220,7 +221,9 @@ private:
           GET_COLUMN(X_translated, m) = GET_COLUMN(X, current_cluster_indices[m])
               - GET_COLUMN(cluster_means_, k);
         }
-        bool success = lanczos_correlation(X_translated, 1, (Scalar) 1.0e-11, 50, TT[k], true);
+        bool success = lanczos_correlation(X_translated, 1, (Scalar) 1.0e-11,
+            50, TT[k], true);
+        assert(success == 0);
       }
 
 #if defined(DEBUG)
@@ -275,7 +278,9 @@ private:
         GET_COLUMN(X_translated, i) = GET_COLUMN(X, current_cluster_indices[i])
             - GET_COLUMN(cluster_means_, k);
       }
-      lanczos_correlation(X_translated, M_, (Scalar) 1.0e-8, 50, eigenvectors_[k], true);
+      bool success = lanczos_correlation(X_translated, M_, (Scalar) 1.0e-8,
+          std::max(50,3*M_), eigenvectors_[k], true);
+      assert(success == 0);
     }
     Scalar L_value_final = L_norm(X, eigenvectors_);
     if (!my_rank_) std::cout << "L value final " << L_value_final << std::endl;
