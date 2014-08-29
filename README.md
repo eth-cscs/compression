@@ -37,6 +37,8 @@ or CUDA for the computations. The usage is identical for all variants.
     -o, --output-file   The path to the file where the reconstructed data is written.
                         default: INPUT_FILE_reconstructed.nc4
     -a, --append        The data is appended to the output file instead of overwriting it.
+    -s, --statistics    Print out statistics about original and reconstructed
+                        variables at the end of the run.
 
 
 Setup
