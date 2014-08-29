@@ -153,11 +153,7 @@ private:
     // collect number of columns each process has
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_processes_);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank_);
-    int *Nd_global = new int[mpi_processes_];
-    MPI_Allgather( &Nd_, 1, MPI_INT, Nd_global, 1, MPI_INT,
-        MPI_COMM_WORLD);
-    Nd_total_ = 0;
-    for (int i=0; i<mpi_processes_; i++) {Nd_total_ += Nd_global[i];}
+    MPI_Allreduce(&Nd_, &Nd_total_, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
     // set up data
     cluster_indices_ = std::vector<int>(Nd_, 0);
@@ -171,9 +167,6 @@ private:
     // set up sizes
     original_size = Nc_ * Nd_total_;
     compressed_size = Nd_total_ + Nc_ * K_ + K_ * Nc_ * M_ + K_ * M_ * Nd_total_;
-
-    delete[] Nd_global;
-
   }
 
   /**
