@@ -4,6 +4,9 @@ USI Compression
 This repository contains a Matlab and C++ implementation of the compression
 algorithm developped at USI by Prof. Illia Horenko.
 
+Information about planned feature and future work can be found on the
+[to-do list](TODO.md).
+
 
 Usage
 -----
@@ -65,6 +68,11 @@ systems, these can be loaded with the modulefile in the folder 'util'.
                            # 'make minlin_device'
 
     aprun usi_compression_minlin_host INPUT_DATA -v VAR1 VAR2 ... # see 'Usage'
+
+### Warning
+**The minlin version currently only runs correctly when built with debug
+options. Therefore, use 'cmake -DCMAKE_BUILD_TYPE=Debug ..' when using the
+minlin version.**
 
 
 Requirements
