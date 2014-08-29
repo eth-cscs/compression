@@ -7,8 +7,8 @@
  *             Universita della Svizzera italiana (USI) &
  *             Centro Svizzero di Calcolo Scientifico (CSCS).
  *             All rights reserved.
- *             This software may be modified and distributed under the terms
- *             of the BSD license. See the LICENSE file for details.
+ *             This software may be modified and distributed under the terms of
+ *             the BSD license. See the [LICENSE file](LICENSE.md) for details.
  *
  *  \author Will Sawyer (CSCS)
  *  \author Ben Cumming (CSCS)
@@ -23,19 +23,29 @@
 #include "matrices.h"
 
 /**
-	   This template performs the Lanczos algorithm on a correlation
-	   matrix defined through the "Xtranslated" set of observations.
-           In this case only the eigenvectors are needed
-
-	   The function arguments listed with "param" will be compared
-	   to the declaration and verified.
-	 
-	   @param[in]     filename    Filename (string)
-	   @param[in]     fields      List of the fields to be extracted (vector of strings0
-	   @return                    vector of concatenated field values
-	 */
-
-
+ * This function calculates the N largest eigenvectors for the covariance
+ * matrix Xtranslated*Xtranslated.T using the Lanczos algorithm. A Krylov
+ * subspace is created, in which the eigenvalues/-vectors are calculated. The
+ * Ritz vectors are then used to find corresponding eigenvectors of the
+ * original matrix. The algorithm iteratively increases the size of the Krylov
+ * subspace until the N largest eigenvectors are found to a sufficient
+ * accuracy.
+ *
+ * This is the Eigen version of this algorithm.
+ *
+ * \param[in]  Xtranslated      The matrix of which we want to calculate the
+ *                              eigenvectors of the data's covariance matrix.
+ * \param[in]  ne               The number of eigenvectors we want to find.
+ * \param[in]  tol              The tolerance for the largest relative error.
+ * \param[in]  max_iter         The maximum number of iterations.
+ * \param[out] EV               The output matrix, the columns of which will be
+ *                              set to the eigenvectors that are found.
+ * \param[in]  reorthogonalize  Whether the basis of the Krylov subspace should
+ *                              be reorthogonalized at every iteration step.
+ *                              (default: false)
+ * \return                      Returns 'false' if successful, 'true' otherwise,
+ *                              similar to a POSIX exit status.
+ */
 template <typename Scalar>
 bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, const Scalar tol, const int max_iter, DeviceMatrix<Scalar> &EV, bool reorthogonalize = false)
 {

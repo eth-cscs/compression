@@ -6,8 +6,8 @@
  *             Universita della Svizzera italiana (USI) &
  *             Centro Svizzero di Calcolo Scientifico (CSCS).
  *             All rights reserved.
- *             This software may be modified and distributed under the terms
- *             of the BSD license. See the LICENSE file for details.
+ *             This software may be modified and distributed under the terms of
+ *             the BSD license. See the [LICENSE file](LICENSE.md) for details.
  *
  *  \author Will Sawyer (CSCS)
  *  \author Ben Cumming (CSCS)

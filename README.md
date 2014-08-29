@@ -44,6 +44,16 @@ or CUDA for the computations. The usage is identical for all variants.
                         variables at the end of the run.
 
 
+Documentation
+-------------
+
+The program uses [Doxygen](http://www.doxygen.org) for documentation. Run
+Doxygen with the Doxyfile found in the repository. The documentation will be
+generated in the doc/ folder.
+
+    doxygen Doxyfile
+
+
 Setup
 -----
 
@@ -106,6 +116,7 @@ Requirements
 
 License
 -------
+
 Copyright (c) 2014, Università della Svizzera italiana (USI) & Centro Svizzero di Calcolo Scientifico (CSCS)  
 All rights reserved.
 

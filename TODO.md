@@ -7,6 +7,7 @@ Fixing problems in the current algorithm
 * Add warning/error when a dimension with a small length is distributed.
   This prevents problems when an indexed dimension has not been specified
   by accident.
+* Make X_reduced only take up M_*Nd_ space instead of M_*K_*Nd_.
 
 
 Problems with dependencies

@@ -7,8 +7,8 @@
  *             Universita della Svizzera italiana (USI) &
  *             Centro Svizzero di Calcolo Scientifico (CSCS).
  *             All rights reserved.
- *             This software may be modified and distributed under the terms
- *             of the BSD license. See the LICENSE file for details.
+ *             This software may be modified and distributed under the terms of
+ *             the BSD license. See the [LICENSE file](LICENSE.md) for details.
  *
  *  \author Will Sawyer (CSCS)
  *  \author Ben Cumming (CSCS)
@@ -24,29 +24,18 @@
 #include "matrices.h"
 
 /**
-	   This template performs the Lanczos algorithm on a correlation
-	   matrix defined through the "Xtranslated" set of observations.
-           In this case only the eigenvectors are needed
-
-	   The function arguments listed with "param" will be compared
-	   to the declaration and verified.
-	 
-	   @param[in]     Xtranslated Matrix with column vectors that are used for PCA    
-	   @param[in]     ne          Number of eigenvectors that are to be calculated
-	   @param[in]     tol         Tolerance for eigenvector residuals
-	   @param[in]     max_iter    Maximum number of iterations for the Lanczos algorithm
-	   @param[out]    EV          Matrix where the calculated eigenvectors are written
-	   @param[in]     reorthogonalize Whether the Lanczos algorithm should use reorthogonalization (default:false)
-	   @return                    Returns true if the algorithm fails
-	 */
-
-
+ * \brief Overloaded wrapper around ssteqr.
+ */
 lapack_int steqr(const lapack_int n, float* d, float* e, float* z, float* work) {
     int info;
     char compz = 'I';
     ssteqr(&compz, &n, d, e, z, &n, work, &info);
     return info;
 }
+
+/**
+ * \brief Overloaded wrapper around dsteqr.
+ */
 lapack_int steqr(const lapack_int n, double* d, double* e, double* z, double* work) {
     int info;
     char compz = 'I';
@@ -54,60 +43,96 @@ lapack_int steqr(const lapack_int n, double* d, double* e, double* z, double* wo
     return info;
 }
 
+/**
+ * This function is a wrapper around the LAPACK eigensolver ?steqr that we use
+ * for finding the eigenvectors of the Krylov subspace constructed in the
+ * Lanczos solver. It resorts the eigenvalues and -vectors in descending order
+ * and only returns the N largest eigenvalues and their -vectors.
+ *
+ * \param[in]  T        The tridiagonal matrix for which we want to find the
+ *                      eigenvalues and -vectors (n*n array).
+ * \param[out] V        The output matrix for the eigenvectors (n*num_eigs
+ *                      array).
+ * \param[out] eigs     The output vector for the eigenvalues (1*num_eigs array)
+ * \param[in]  n        The dimensions of the matrix.
+ * \param[in]  num_eigs The number of eigenvalues/-vectors we want to calculate
+                        (optional, default: n).
+ * \return              Returns 'true' if successful, 'false' otherwise.
+ */
 template <typename Scalar>
-bool steigs
-    (
-        const Scalar *T,    // nxn input matrix T
-        Scalar *V,    // nxn output matrix for eigenvectors
-        Scalar *eigs, // output for eigenvalues
-        const int n,
-        int num_eigs=-1
-    )
-{
-    num_eigs = num_eigs<0 ? n : num_eigs;
-    num_eigs = num_eigs>n ? n : num_eigs;
+bool steigs(const Scalar *T, Scalar *V, Scalar *eigs, const int n, int num_eigs=-1) {
 
-    // allocate memory for arrays used by LAPACK
-    Scalar *e = new Scalar[n-1];   // superdiagonal
-    Scalar *z = new Scalar[n*n];   // eigenvectors returned by LAPACK
-    Scalar *d = new Scalar[n];       // diagonal, used by ?steqr for storing eigenvalues
-    Scalar *work = new Scalar[2*n];  // working array for LAPACK
+  // set num_eigs if it is omitted and avoid trying to return more than n values
+  num_eigs = num_eigs<0 ? n : num_eigs;
+  num_eigs = num_eigs>n ? n : num_eigs;
 
-    // pack the diagonal and super diagonal of T
-    int pos=0;
-    for(int i=0; i<n-1; i++) {
-        d[i] = T[pos];       // diagonal at T(i,i)
-        e[i] = T[pos+1];     // off diagonal at T(i,i+1)
-        pos += (n+1);
-    }
-    d[n-1] = T[pos];
+  // allocate memory for arrays used by LAPACK
+  Scalar *e = new Scalar[n-1];   // superdiagonal
+  Scalar *z = new Scalar[n*n];   // eigenvectors returned by LAPACK
+  Scalar *d = new Scalar[n];       // diagonal, used by ?steqr for storing eigenvalues
+  Scalar *work = new Scalar[2*n];  // working array for LAPACK
 
-    // compute eigenvalues
-    lapack_int result = steqr(n, d, e, z, work);
-    if(result)
-        return false;
+  // pack the diagonal and super diagonal of T
+  int pos=0;
+  for(int i=0; i<n-1; i++) {
+      d[i] = T[pos];       // diagonal at T(i,i)
+      e[i] = T[pos+1];     // off diagonal at T(i,i+1)
+      pos += (n+1);
+  }
+  d[n-1] = T[pos];
 
-    // copy the eigenvalues/-vectors to the output arrays
-    // and reverse the order as ?steqr returns them in 
-    // ascending order
-    for(int i=0; i<num_eigs; i++) {
-        Scalar* ptr_to   = V + i*n;
-        Scalar* ptr_from = z + (n-i-1)*n;
-        std::copy(ptr_from,  ptr_from+n,  ptr_to);
-        std::copy(d + (n-i-1), d + (n-i), eigs + i);
-    }
+  // compute eigenvalues
+  lapack_int result = steqr(n, d, e, z, work);
+  if(result)
+      return false;
 
-    // free working arrays
-    delete[] e;
-    delete[] z;
-    delete[] d;
-    delete[] work;
+  // copy the eigenvalues/-vectors to the output arrays
+  // and reverse the order as ?steqr returns them in
+  // ascending order
+  for(int i=0; i<num_eigs; i++) {
+      Scalar* ptr_to   = V + i*n;
+      Scalar* ptr_from = z + (n-i-1)*n;
+      std::copy(ptr_from,  ptr_from+n,  ptr_to);
+      std::copy(d + (n-i-1), d + (n-i), eigs + i);
+  }
 
-    return true;
+  // free working arrays
+  delete[] e;
+  delete[] z;
+  delete[] d;
+  delete[] work;
+
+  return true;
 }
 
+/**
+ * This function calculates the N largest eigenvectors for the covariance
+ * matrix Xtranslated*Xtranslated.T using the Lanczos algorithm. A Krylov
+ * subspace is created, in which the eigenvalues/-vectors are calculated. The
+ * Ritz vectors are then used to find corresponding eigenvectors of the
+ * original matrix. The algorithm iteratively increases the size of the Krylov
+ * subspace until the N largest eigenvectors are found to a sufficient
+ * accuracy.
+ *
+ * This is the minlin version of this algorithm.
+ *
+ * \see steigs
+ *
+ * \param[in]  Xtranslated      The matrix of which we want to calculate the
+ *                              eigenvectors of the data's covariance matrix.
+ * \param[in]  ne               The number of eigenvectors we want to find.
+ * \param[in]  tol              The tolerance for the largest relative error.
+ * \param[in]  max_iter         The maximum number of iterations.
+ * \param[out] EV               The output matrix, the columns of which will be
+ *                              set to the eigenvectors that are found.
+ * \param[in]  reorthogonalize  Whether the basis of the Krylov subspace should
+ *                              be reorthogonalized at every iteration step.
+ *                              (default: false)
+ * \return                      Returns 'false' if successful, 'true' otherwise,
+ *                              similar to a POSIX exit status.
+ */
 template <typename Scalar>
-bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, const Scalar tol, const int max_iter, DeviceMatrix<Scalar> &EV, bool reorthogonalize = false)
+bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, const Scalar tol, int max_iter, DeviceMatrix<Scalar> &EV, bool reorthogonalize = false)
 {
   int N = Xtranslated.rows(); // this corresponds to Ntl in usi_compression.cpp
   Scalar gamma, delta;
