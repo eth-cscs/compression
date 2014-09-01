@@ -92,8 +92,6 @@
 #define VERSION 0.1 ///< Version number of the program.
 #define KSIZE 10 ///< Default number of clusters.
 #define MSIZE 5  ///< Default number of eigenvectors used for final compression.
-#define MAX_ITER 100 ///< Maximum number of iterations for clustering.
-#define TOL 1.0e-7   ///< Tolerance level for cluster convergence.
 #define RANDOM_SEED 123456  ///< Random seed for initial vector in Lanczos algorithm (Eigen version only)
 
 /**
@@ -220,7 +218,7 @@ int main(int argc, char *argv[]) {
   //
 
   std::vector<int> col_ids = netcdf_interface.get_column_ids();
-  CompressedMatrix<Scalar> X_compressed(X, K_size, M_size, TOL, col_ids);
+  CompressedMatrix<Scalar> X_compressed(X, K_size, M_size, col_ids);
   
   double time_after_compression = MPI_Wtime();
 
