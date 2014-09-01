@@ -166,7 +166,7 @@ private:
 
     // set up sizes
     original_size = Nc_ * Nd_total_;
-    compressed_size = Nd_total_ + Nc_ * K_ + K_ * Nc_ * M_ + K_ * M_ * Nd_total_;
+    compressed_size = Nd_total_ + Nc_ * K_ + K_ * Nc_ * M_ + M_ * Nd_total_;
   }
 
   /**
