@@ -20,6 +20,7 @@
 #include <vector>   // std::vector
 #include <set>      // std::set
 #include <map>      // std::map
+#include <stdexcept>// std::logic_error
 #include <mpi.h>    // MPI_Comm_size, MPI_Comm_rank, MPI_Barrier
 #include <netcdf_par.h>
 #include <netcdf.h>
@@ -85,10 +86,10 @@ public:
    *                            HORIZONTAL for a distributed dimension and
    *                            VERTICAL for a compressed dimension.
    */
-  NetCDFInterface(const std::string filename,
-                  const std::vector<std::string> variables,
-                  const std::vector<std::string> compressed_dims,
-                  const std::vector<std::string> indexed_dims,
+  NetCDFInterface(const std::string &filename,
+                  const std::vector<std::string> &variables,
+                  const std::vector<std::string> &compressed_dims,
+                  const std::vector<std::string> &indexed_dims,
                   const Stacking stacking = VERTICAL) {
 
     // save internal variables
@@ -279,7 +280,7 @@ public:
    *      write_data()
    *
    * \param[in] input         The matrix that is to be written to the file.
-   * \param[in] filename_out  The absolute or relative path to the file where
+   * \param[in] filename      The absolute or relative path to the file where
    *                          the data is written. If this is an empty string,
    *                          the data is written to
    *                          INPUT_FILE_reconstructed.nc4.
@@ -288,9 +289,10 @@ public:
    *                          existing file instead of overwriting it.
    *                          (default: false)
    */
-  void write_matrix(DeviceMatrix<Scalar> input, std::string filename_out = "",
-      bool append = false) {
+  void write_matrix(const DeviceMatrix<Scalar> &input,
+      const std::string &filename = "", const bool append = false) {
 
+    std::string filename_out = filename;
     if (filename_out.empty()) filename_out =
         filename_.substr(0,filename_.length()-4) + "_reconstructed.nc4";
     if (!my_rank_) std::cout << "Writing data to file " << filename_out << std::endl;
@@ -421,7 +423,7 @@ private:
   /**
    * \brief Overloaded wrapper around nc_get_vara_double.
    */
-  int nc_get_vara(int ncid, int varid, const size_t start[], const size_t
+  int nc_get_vara(const int ncid, const int varid, const size_t start[], const size_t
       count[], double *dp) {
     int retval = nc_get_vara_double(ncid, varid, start, count, dp);
     return retval;
@@ -430,7 +432,7 @@ private:
   /**
    * \brief Overloaded wrapper around nc_get_vara_float.
    */
-  int nc_get_vara(int ncid, int varid, const size_t start[], const size_t
+  int nc_get_vara(const int ncid, const int varid, const size_t start[], const size_t
       count[], float *fp) {
     int retval = nc_get_vara_float(ncid, varid, start, count, fp);
     return retval;
@@ -439,7 +441,7 @@ private:
   /**
    * \brief Overloaded wrapper around nc_put_vara_double.
    */
-  int nc_put_vara(int ncid, int varid, const size_t start[], const size_t
+  int nc_put_vara(const int ncid, const int varid, const size_t start[], const size_t
       count[], const double *fp) {
     int retval = nc_put_vara_double(ncid, varid, start, count, fp);
     return retval;
@@ -448,7 +450,7 @@ private:
   /**
    * \brief Overloaded wrapper around nc_put_vara_float.
    */
-  int nc_put_vara(int ncid, int varid, const size_t start[], const size_t
+  int nc_put_vara(const int ncid, const int varid, const size_t start[], const size_t
       count[], const float *fp) {
     int retval = nc_put_vara_float(ncid, varid, start, count, fp);
     return retval;
@@ -950,7 +952,7 @@ private:
    *          addition, we use an offset to account for other variables that
    *          have already been written to the matrix.
    */
-  HostMatrix<Scalar> restructure_data(std::vector< HostVector<Scalar> > &data) {
+  HostMatrix<Scalar> restructure_data(const std::vector< HostVector<Scalar> > &data) {
 
     HostMatrix<Scalar> output(n_rows_, n_cols_);
 
@@ -1000,7 +1002,7 @@ private:
    * \return          Vector with data for each variable as read by
    *                  write_data().
    */
-  std::vector< HostVector<Scalar> > recompose_data(HostMatrix<Scalar> data) {
+  std::vector< HostVector<Scalar> > recompose_data(const HostMatrix<Scalar> &data) {
 
     std::vector< HostVector<Scalar> > output(n_variables_);
     
@@ -1055,7 +1057,7 @@ private:
    * \warning This function doesn't use parallel file access and should only
    *          be called by one process.
    */
-  void setup_output_file(std::string filename_out, bool append) {
+  void setup_output_file(const std::string &filename_out, const bool append) {
     /* This creates a new file 'filename' with all the dimensions and
      * variables that have been read from the original input file. */
 
@@ -1098,7 +1100,7 @@ private:
    *                          library.
    * \return                  Map from the old dimension IDs to the new ones.
    */
-  std::map<int, int> create_all_dimensions(int netcdf_id_out) {
+  std::map<int, int> create_all_dimensions(const int netcdf_id_out) {
     
     // we need to collect all dimension ids that are used
     std::set<int> all_used_dim_ids;
@@ -1150,7 +1152,7 @@ private:
    *                          library.
    * \param[in] dim_map       Map from the old dimension IDs to the new ones.
    */
-  void create_all_variables(int netcdf_id_out, std::map<int, int> dim_map) {
+  void create_all_variables(const int netcdf_id_out, const std::map<int, int> &dim_map) {
 
     for (int v = 0; v < n_variables_; v++) {
 
@@ -1167,7 +1169,13 @@ private:
       // translate dimension ids for variable to ids for output file
       std::vector<int> dim_ids_out(variable_dims_[v]);
       for (int d = 0; d < variable_dims_[v]; d++) {
-        dim_ids_out[d] = dim_map[dim_ids[d]];
+        std::map<int,int>::const_iterator it = dim_map.find(dim_ids[d]);
+        if (it != dim_map.end()) {
+          dim_ids_out[d] = it->second;
+        } else {
+          // this should never happen
+          throw std::logic_error("Dimension ID not found in map.");
+        }
       }
 
       int var_id;
@@ -1184,7 +1192,7 @@ private:
    * \param[in] data          Vector of data arrays as returned by
    *                          recompose_data().
    */
-  void write_data(std::string filename_out, std::vector< HostVector<Scalar> > data) {
+  void write_data(const std::string &filename_out, const std::vector< HostVector<Scalar> > &data) {
 
     // NetCDF: open file for read/write access
     int netcdf_id_out;
@@ -1216,7 +1224,7 @@ private:
    * \return                  IDs for all selected variables, used by the
    *                          NetCDF library.
    */
-  std::vector<int> get_new_variable_ids(int netcdf_id_out) {
+  std::vector<int> get_new_variable_ids(const int netcdf_id_out) {
 
     std::vector<int> new_variable_ids(n_variables_);
 
