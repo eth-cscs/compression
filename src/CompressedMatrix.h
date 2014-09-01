@@ -133,7 +133,6 @@ private:
   int Nd_total_;  ///< The total number of columns of the original matrix.
 
   // information about MPI
-  int mpi_processes_;
   int my_rank_;   ///< \brief The rank (ID) of the current MPI process. This
                   ///< is mainly used to limit the console output to one
                   ///< process.
@@ -151,7 +150,6 @@ private:
   void initialize_data(std::vector<int> column_ids) {
     
     // collect number of columns each process has
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_processes_);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank_);
     MPI_Allreduce(&Nd_, &Nd_total_, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
