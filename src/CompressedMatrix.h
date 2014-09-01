@@ -64,16 +64,20 @@ public:
    * \param[in] X           The matrix that is to be compressed.
    * \param[in] K           The number of clusters used for compression.
    * \param[in] M           The number of eigenvectors used per cluster.
+   * \param[in] tolerance   The tolerance level at which we consider the
+   *                        clustering to have converged.
    * \param[in] column_ids  A vector of unique IDs for the column of the
    *                        matrix, independent of the number of processes,
    *                        used for assigning the initial clusters.
    */
-  CompressedMatrix(const DeviceMatrix<Scalar> &X, const int K, const int M, std::vector<int> column_ids) {
+  CompressedMatrix(const DeviceMatrix<Scalar> &X, const int K, const int M,
+      const <Scalar> tolerance, std::vector<int> column_ids) {
 
-    Nc_ = X.rows(); // number of entries along compressed direction
-    Nd_ = X.cols(); // number of entries along distributed direction
-    K_  = K;        // number of clusters
-    M_  = M;        // number of eigenvectors per cluster
+    Nc_ = X.rows();   // number of entries along compressed direction
+    Nd_ = X.cols();   // number of entries along distributed direction
+    K_  = K;          // number of clusters
+    M_  = M;          // number of eigenvectors per cluster
+    tol_ = tolerance; // tolerance for cluster convergence
 
     initialize_data(column_ids);
     do_iterative_clustering(X);
@@ -127,6 +131,7 @@ private:
   // data sizes
   int K_;         ///< The number of clusters.
   int M_;         ///< The number of eigenvectors calculated fo each cluster.
+  int tol_;       ///< The tolerance level for cluster convergence.
   int Nc_;        ///< The number of rows of the original matrix.
   int Nd_;        ///< \brief The number of columns of the original matrix
                   ///< that are assigned to the current process.
@@ -229,8 +234,8 @@ private:
       // calculate new L value and decide whether to continue
       L_value_new = L_norm(X, TT);
       if (!my_rank_) std::cout << "L value after gamma minimization " << L_value_new << std::endl;
-      if ( (L_value_old - L_value_new) < L_value_new*TOL ) {
-        if (!my_rank_) std::cout << " Converged: to tolerance " << TOL
+      if ( (L_value_old - L_value_new) < L_value_new*tol_ ) {
+        if (!my_rank_) std::cout << " Converged: to tolerance " << tol_
             << " after " << iter << " iterations " << std::endl;
         break;
       }

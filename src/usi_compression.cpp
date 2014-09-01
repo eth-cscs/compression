@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
   //
 
   std::vector<int> col_ids = netcdf_interface.get_column_ids();
-  CompressedMatrix<Scalar> X_compressed(X, K_size, M_size, col_ids);
+  CompressedMatrix<Scalar> X_compressed(X, K_size, M_size, TOL, col_ids);
   
   double time_after_compression = MPI_Wtime();
 
