@@ -20,20 +20,37 @@
 
 #include <mpi.h>
 
+/**
+ * A simple templated struct that has a variable 'value'. This is overloaded
+ * so 'value' always contains the MPI type corresponding to the typename T.
+ * The standard template doesn't define 'value' so a compiler error is raised
+ * when the helper is used with an unsupported type.
+ *
+ * \see mpi_type_helper<float>, mpi_type_helper<double>, mpi_type_helper<int>
+ */
 template <typename T>
 struct mpi_type_helper {};
 
+/**
+ * \brief Overloaded template (for floats), see mpi_type_helper.
+ */
 template <>
 struct mpi_type_helper<float> {
-  static const int value = MPI_FLOAT;
+  static const int value = MPI_FLOAT; ///< Variable holding the MPI type.
 };
 
+/**
+ * \brief Overloaded template (for doubles), see mpi_type_helper.
+ */
 template <>
 struct mpi_type_helper<double> {
-  static const int value = MPI_DOUBLE;
+  static const int value = MPI_DOUBLE; ///< Variable holding the MPI type.
 };
 
+/**
+ * \brief Overloaded template (for integers), see mpi_type_helper.
+ */
 template <>
 struct mpi_type_helper<int> {
-  static const int value = MPI_INT;
+  static const int value = MPI_INT; ///< Variable holding the MPI type.
 };

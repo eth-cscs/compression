@@ -21,11 +21,33 @@
 #include <iostream>
 #include <iomanip>
 #include <limits>
-
 using namespace std; // we dump the namespace because we use it extensively
 
-
-
+/**
+ * This function calculates several statistics for comparing the original and
+ * reconstructed matrix. It prints them to the standard output with friendly
+ * formatting.
+ *
+ * \param[in] X_original      Matrix with the original, uncompressed data.
+ * \param[in] X_reconstructed Matrix with the data that has been reconstructed
+ *                            from the compressed data.
+ * \param[in] variable_names  Names for all compressed variables.
+ * \param[in] variable_mean   The mean value for each variable that has been
+ *                            used for standardizing the data before compression.
+ * \param[in] variable_max    The maximum absolute value (after subtracting
+ *                            the mean) for each variable that has been used
+ *                            for standardizing the data before compression.
+ * \param[in] row_start       The row in the compression matrix where the
+ *                            data for a variable starts (one entry per
+ *                            variable).
+ * \param[in] row_count       The number of rows in the compression matrix
+ *                            with data for a variable (one entry per variable).
+ * \param[in] col_start       The column in the compression matrix where the
+ *                            data for a variable starts (one entry per
+ *                            variable).
+ * \param[in] col_count       The number of columns in the compression matrix
+ *                            with data for a variable (one entry per variable).
+ */
 template<class Scalar>
 void print_statistics(const DeviceMatrix<Scalar> &X_original,
                       const DeviceMatrix<Scalar> &X_reconstructed,
