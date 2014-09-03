@@ -17,7 +17,7 @@
 
 #pragma once
 #include <cstdlib>   // std::abs
-#include <algorithm> // std::max
+#include <algorithm> // std::max, std::min
 #include <mpi.h>     // MPI_Allreduce
 #include "mpi_type_helper.h"
 #include "matrices.h"
@@ -47,7 +47,7 @@
  *                              similar to a POSIX exit status.
  */
 template <typename Scalar>
-bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, const Scalar tol, const int max_iter, DeviceMatrix<Scalar> &EV, bool reorthogonalize = false)
+bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, const Scalar tol, int max_iter, DeviceMatrix<Scalar> &EV, bool reorthogonalize = false)
 {
   int N = Xtranslated.rows();
   Scalar gamma, delta;
@@ -56,7 +56,7 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
   // check that output matrix has correct dimensions
   assert(EV.rows() == N);
   assert(EV.cols() == ne);
-  assert(N         >= max_iter);
+  max_iter = std::min(N, max_iter);
 
   // check whether the cluster is empty
   int local_vectors = Xtranslated.cols();

@@ -17,7 +17,7 @@
 
 #pragma once
 #include <cstdlib>   // std::abs
-#include <algorithm> // std::copy, std::max
+#include <algorithm> // std::copy, std::max, std::min
 #include <mkl.h>     // ssteqr, dsteqr
 #include <mpi.h>     // MPI_Allreduce
 #include "mpi_type_helper.h"
@@ -140,7 +140,7 @@ bool lanczos_correlation(const DeviceMatrix<Scalar> &Xtranslated, const int ne, 
   // check that output matrix has correct dimensions
   assert(EV.rows() == N);
   assert(EV.cols() == ne);
-  assert(N         >= max_iter);
+  max_iter = std::min(N, max_iter);
 
   // check whether the cluster is empty
   int local_vectors = Xtranslated.cols();
