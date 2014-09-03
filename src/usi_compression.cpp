@@ -92,7 +92,6 @@
 #define VERSION 0.1 ///< Version number of the program.
 #define KSIZE 10 ///< Default number of clusters.
 #define MSIZE 5  ///< Default number of eigenvectors used for final compression.
-#define RANDOM_SEED 123456  ///< Random seed for initial vector in Lanczos algorithm (Eigen version only)
 
 /**
  * \brief The floating point number type used for all computations. Use

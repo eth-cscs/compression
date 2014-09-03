@@ -32,6 +32,7 @@
 
 #define MAX_ITER 100 ///< Maximum number of iterations for clustering.
 #define TOL 1.0e-7   ///< Tolerance level for cluster convergence.
+#define RANDOM_SEED 123456  ///< Random seed for initial vector in Lanczos algorithm (Eigen version only)
 
 /**
  * The class CompressedMatrix stores all the information needed to represent
