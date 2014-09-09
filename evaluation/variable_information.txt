@@ -1,0 +1,397 @@
+VARIABLE	INFO	VALUE
+CCN3	levels	30
+CCN3	name	CCN concentration at S=0.1%
+SLFLX	levels	31
+SLFLX	name	Liquid static energy flux
+CLDICE	levels	30
+CLDICE	name	Grid box averaged cloud ice amount
+FSNTOAC	levels	1
+FSNTOAC	name	Clearsky net solar flux at top of atmosphere
+FLUTC	levels	1
+FLUTC	name	Clearsky upwelling longwave flux at top of model
+dst_a1	levels	30
+dst_a1	name	dst_a1 concentration
+dst_a3	levels	30
+dst_a3	name	dst_a3 concentration
+TGCLDCWP	levels	1
+TGCLDCWP	name	Total grid-box cloud water path (liquid and ice)
+SFNUMLIQ	levels	1
+SFNUMLIQ	name	NUMLIQ surface flux
+IWC	levels	30
+IWC	name	Grid box average ice water content
+QREFHT	levels	1
+QREFHT	name	Reference height humidity
+FSNS	levels	1
+FSNS	name	Net solar flux at surface
+CLDLIQ	levels	30
+CLDLIQ	name	Grid box averaged cloud liquid amount
+DCQ	levels	30
+DCQ	name	Q tendency due to moist processes
+PRECSC	levels	1
+PRECSC	name	Convective snow rate (water equivalent)
+LND_MBL	levels	1
+LND_MBL	name	Soil erodibility factor
+T700	levels	1
+T700	name	Temperature at 700 mbar pressure surface
+DSTSFDRY	levels	1
+DSTSFDRY	name	Dry deposition flux at surface
+PRECSL	levels	1
+PRECSL	name	Large-scale (stable) snow rate (water equivalent)
+FLDS	levels	1
+FLDS	name	Downwelling longwave flux at surface
+T	levels	30
+T	name	Temperature
+VFLX	levels	31
+VFLX	name	Meridional momentm flux
+KVM	levels	31
+KVM	name	Vertical diffusion diffusivities (momentum)
+LANDFRAC	levels	1
+LANDFRAC	name	Fraction of sfc area covered by land
+KVH	levels	31
+KVH	name	Vertical diffusion diffusivities (heat/moisture)
+dst_a1SF	levels	1
+dst_a1SF	name	dst_a1 dust surface emission
+CMFDQ	levels	30
+CMFDQ	name	QV tendency - shallow convection
+pom_a1	levels	30
+pom_a1	name	pom_a1 concentration
+wat_a2	levels	30
+wat_a2	name	aerosol water, interstitial, mode 02
+wat_a3	levels	30
+wat_a3	name	aerosol water, interstitial, mode 03
+wat_a1	levels	30
+wat_a1	name	aerosol water, interstitial, mode 01
+CLDMED	levels	1
+CLDMED	name	Vertically-integrated mid-level cloud
+FSDS	levels	1
+FSDS	name	Downwelling solar flux at surface
+FSNTOA	levels	1
+FSNTOA	name	Net solar flux at top of atmosphere
+CLDLOW	levels	1
+CLDLOW	name	Vertically-integrated low cloud
+SLV	levels	30
+SLV	name	Liq wat virtual static energy
+DMS	levels	30
+DMS	name	DMS concentration
+CLDFSNOW	levels	30
+CLDFSNOW	name	CLDFSNOW
+SHFLX	levels	1
+SHFLX	name	Surface sensible heat flux
+SFCLDICE	levels	1
+SFCLDICE	name	CLDICE surface flux
+DTV	levels	30
+DTV	name	T vertical diffusion
+PS	levels	1
+PS	name	Surface pressure
+CLDTOT	levels	1
+CLDTOT	name	Vertically-integrated total cloud
+TKE	levels	31
+TKE	name	Turbulent Kinetic Energy
+H2O2	levels	30
+H2O2	name	H2O2 concentration
+ANRAIN	levels	30
+ANRAIN	name	Average rain number conc
+SWCF	levels	1
+SWCF	name	Shortwave cloud forcing
+CMFMCDZM	levels	31
+CMFMCDZM	name	Convection mass flux from ZM deep
+AEROD_v	levels	1
+AEROD_v	name	Total Aerosol Optical Depth in visible band
+SFNUMICE	levels	1
+SFNUMICE	name	NUMICE surface flux
+dgnd_a03	levels	30
+dgnd_a03	name	dry dgnum, interstitial, mode 03
+AODABS	levels	1
+AODABS	name	Aerosol absorption optical depth 550 nm
+SSTSFWET	levels	1
+SSTSFWET	name	Wet deposition flux at surface
+FREQL	levels	30
+FREQL	name	Fractional occurance of liquid
+TAUX	levels	1
+TAUX	name	Zonal surface stress
+TAUY	levels	1
+TAUY	name	Meridional surface stress
+ICIMR	levels	30
+ICIMR	name	Prognostic in-cloud ice mixing ratio
+SRFRAD	levels	1
+SRFRAD	name	Net radiative flux at surface
+Z3	levels	30
+Z3	name	Geopotential Height (above sea level)
+TREFMXAV	levels	1
+TREFMXAV	name	Average of TREFHT daily maximum
+WSUB	levels	30
+WSUB	name	Diagnostic sub-grid vertical velocity
+BURDEN3	levels	1
+BURDEN3	name	Aerosol burden mode 3
+BURDEN2	levels	1
+BURDEN2	name	Aerosol burden mode 2
+BURDEN1	levels	1
+BURDEN1	name	Aerosol burden mode 1
+FREQS	levels	30
+FREQS	name	Fractional occurance of snow
+FLNSC	levels	1
+FLNSC	name	Clearsky net longwave flux at surface
+CDNUMC	levels	1
+CDNUMC	name	Vertically-integrated droplet concentration
+AQSNOW	levels	30
+AQSNOW	name	Average snow mixing ratio
+NUMICE	levels	30
+NUMICE	name	Grid box averaged cloud ice number
+CLDHGH	levels	1
+CLDHGH	name	Vertically-integrated high cloud
+Q	levels	30
+Q	name	Specific humidity
+QFLX	levels	1
+QFLX	name	Surface water flux
+PSL	levels	1
+PSL	name	Sea level pressure
+VQ	levels	30
+VQ	name	Meridional water transport
+UU	levels	30
+UU	name	Zonal velocity squared
+WTKE	levels	30
+WTKE	name	Standard deviation of updraft velocity
+FLNS	levels	1
+FLNS	name	Net longwave flux at surface
+FLNT	levels	1
+FLNT	name	Net longwave flux at top of model
+ATMEINT	levels	1
+ATMEINT	name	Vertically integrated total atmospheric energy
+num_a2	levels	30
+num_a2	name	num_a2 concentration
+num_a3	levels	30
+num_a3	name	num_a3 concentration
+ICEFRAC	levels	1
+ICEFRAC	name	Fraction of sfc area covered by sea-ice
+num_a1	levels	30
+num_a1	name	num_a1 concentration
+PRECL	levels	1
+PRECL	name	Large-scale (stable) precipitation rate (liq + ice)
+PRECC	levels	1
+PRECC	name	Convective precipitation rate (liq + ice)
+TROP_T	levels	1
+TROP_T	name	Tropopause Temperature
+ANSNOW	levels	30
+ANSNOW	name	Average snow number conc
+FLNTC	levels	1
+FLNTC	name	Clearsky net longwave flux at top of model
+FREQSH	levels	1
+FREQSH	name	Fractional occurance of shallow convection
+TMQ	levels	1
+TMQ	name	Total (vertically integrated) precipitable water
+FREQI	levels	30
+FREQI	name	Fractional occurance of ice
+TOT_CLD_VISTAU	levels	30
+TOT_CLD_VISTAU	name	Total gbx cloud extinction visible sw optical depth
+ABSORB	levels	30
+ABSORB	name	Aerosol absorption
+FREQZM	levels	1
+FREQZM	name	Fractional occurance of ZM convection
+LWCF	levels	1
+LWCF	name	Longwave cloud forcing
+SSAVIS	levels	1
+SSAVIS	name	Aerosol singel-scatter albedo
+dgnd_a02	levels	30
+dgnd_a02	name	dry dgnum, interstitial, mode 02
+VD01	levels	30
+VD01	name	Vertical diffusion of Q
+TGCLDIWP	levels	1
+TGCLDIWP	name	Total grid-box cloud ice water path
+TOT_ICLD_VISTAU	levels	30
+TOT_ICLD_VISTAU	name	Total in-cloud extinction visible sw optical depth
+U10	levels	1
+U10	name	10m wind speed
+dgnd_a01	levels	30
+dgnd_a01	name	dry dgnum, interstitial, mode 01
+soa_a2	levels	30
+soa_a2	name	soa_a2 concentration
+soa_a1	levels	30
+soa_a1	name	soa_a1 concentration
+SNOWHLND	levels	1
+SNOWHLND	name	Water equivalent snow depth
+QTFLX	levels	31
+QTFLX	name	Total water flux
+TREFMNAV	levels	1
+TREFMNAV	name	Average of TREFHT daily minimum
+TSMX	levels	1
+TSMX	name	Maximum surface temperature over output period
+AREL	levels	30
+AREL	name	Average droplet effective radius
+AREI	levels	30
+AREI	name	Average ice effective radius
+PHIS	levels	1
+PHIS	name	Surface geopotential
+FSUTOA	levels	1
+FSUTOA	name	Upwelling solar flux at top of atmosphere
+DSTSFWET	levels	1
+DSTSFWET	name	Wet deposition flux at surface
+OMEGA	levels	30
+OMEGA	name	Vertical velocity (pressure)
+FLUT	levels	1
+FLUT	name	Upwelling longwave flux at top of model
+PBLH	levels	1
+PBLH	name	PBL height
+RELHUM	levels	30
+RELHUM	name	Relative humidity
+bc_a1	levels	30
+bc_a1	name	bc_a1 concentration
+TREFHT	levels	1
+TREFHT	name	Reference height temperature
+FICE	levels	30
+FICE	name	Fractional ice content within cloud
+AODDUST1	levels	1
+AODDUST1	name	Aerosol optical depth 550 nm model 1 from dust
+AODDUST2	levels	1
+AODDUST2	name	Aerosol optical depth 550 nm model 2 from dust
+AODDUST3	levels	1
+AODDUST3	name	Aerosol optical depth 550 nm model 3 from dust
+AWNC	levels	30
+AWNC	name	Average cloud water number conc
+FSDSC	levels	1
+FSDSC	name	Clearsky downwelling solar flux at surface
+DTCOND	levels	30
+DTCOND	name	T tendency - moist processes
+V	levels	30
+V	name	Meridional wind
+CONCLD	levels	30
+CONCLD	name	Convective cloud cover
+AWNI	levels	30
+AWNI	name	Average cloud ice number conc
+CMFDQR	levels	30
+CMFDQR	name	Q tendency - shallow convection rainout
+NUMLIQ	levels	30
+NUMLIQ	name	Grid box averaged cloud liquid number
+ICWMR	levels	30
+ICWMR	name	Prognostic in-cloud water mixing ratio
+H2SO4	levels	30
+H2SO4	name	H2SO4 concentration
+ORO	levels	1
+ORO	name	ORO
+LCLOUD	levels	30
+LCLOUD	name	Liquid cloud fraction
+ncl_a3	levels	30
+ncl_a3	name	ncl_a3 concentration
+ncl_a2	levels	30
+ncl_a2	name	ncl_a2 concentration
+ncl_a1	levels	30
+ncl_a1	name	ncl_a1 concentration
+ICLDIWP	levels	30
+ICLDIWP	name	In-cloud ice water path
+WGUSTD	levels	1
+WGUSTD	name	wind gusts from turbulence
+SSTODXC	levels	1
+SSTODXC	name	Optical depth for diagnostics
+SFCLDLIQ	levels	1
+SFCLDLIQ	name	CLDLIQ surface flux
+RHREFHT	levels	1
+RHREFHT	name	Reference height relative humidity
+SL	levels	30
+SL	name	Liquid water static energy
+PCONVT	levels	1
+PCONVT	name	convection top pressure
+AODMODE3	levels	1
+AODMODE3	name	Aerosol optical depth 550 nm mode 3
+AODMODE2	levels	1
+AODMODE2	name	Aerosol optical depth 550 nm mode 2
+AODMODE1	levels	1
+AODMODE1	name	Aerosol optical depth 550 nm mode 1
+SOLIN	levels	1
+SOLIN	name	Solar insolation
+ICLDTWP	levels	30
+ICLDTWP	name	In-cloud cloud total water path (liquid and ice)
+PCONVB	levels	1
+PCONVB	name	convection base pressure
+dst_a3SF	levels	1
+dst_a3SF	name	dst_a3 dust surface emission
+DSTODXC	levels	1
+DSTODXC	name	Optical depth for diagnostics
+so4_a1	levels	30
+so4_a1	name	so4_a1 concentration
+so4_a2	levels	30
+so4_a2	name	so4_a2 concentration
+so4_a3	levels	30
+so4_a3	name	so4_a3 concentration
+PRECT	levels	1
+PRECT	name	Total (convective and large-scale) precipitation rate (liq + ice)
+T850	levels	1
+T850	name	Temperature at 850 mbar pressure surface
+FSNTC	levels	1
+FSNTC	name	Clearsky net solar flux at top of model
+UFLX	levels	31
+UFLX	name	Zonal momentum flux
+OCNFRAC	levels	1
+OCNFRAC	name	Fraction of sfc area covered by ocean
+QRL	levels	30
+QRL	name	Longwave heating rate
+TS	levels	1
+TS	name	Surface temperature (radiative)
+QRS	levels	30
+QRS	name	Solar heating rate
+PRECSH	levels	1
+PRECSH	name	Shallow Convection precipitation rate
+OMEGAT	levels	30
+OMEGAT	name	Vertical heat flux
+EXTINCT	levels	30
+EXTINCT	name	Aerosol extinction
+TGCLDLWP	levels	1
+TGCLDLWP	name	Total grid-box cloud liquid water path
+SSTSFMBL	levels	1
+SSTSFMBL	name	Mobilization flux at surface
+CLOUD	levels	30
+CLOUD	name	Cloud fraction
+LHFLX	levels	1
+LHFLX	name	Surface latent heat flux
+SSTSFDRY	levels	1
+SSTSFDRY	name	Dry deposition flux at surface
+FSNT	levels	1
+FSNT	name	Net solar flux at top of model
+TSMN	levels	1
+TSMN	name	Minimum surface temperature over output period
+PRECCDZM	levels	1
+PRECCDZM	name	Convective precipitation rate from ZM deep
+FREQR	levels	30
+FREQR	name	Fractional occurance of rain
+TROP_P	levels	1
+TROP_P	name	Tropopause Pressure
+FSNSC	levels	1
+FSNSC	name	Clearsky net solar flux at surface
+SO2	levels	30
+SO2	name	SO2 concentration
+VT	levels	30
+VT	name	Meridional heat transport
+VU	levels	30
+VU	name	Meridional flux of zonal momentum
+VV	levels	30
+VV	name	Meridional velocity squared
+TAUTMSY	levels	1
+TAUTMSY	name	Meridional turbulent mountain surface stress
+TAUTMSX	levels	1
+TAUTMSX	name	Zonal turbulent mountain surface stress
+TROP_Z	levels	1
+TROP_Z	name	Tropopause Height
+U	levels	30
+U	name	Zonal wind
+CMFDT	levels	30
+CMFDT	name	T tendency - shallow convection
+AQRAIN	levels	30
+AQRAIN	name	Average rain mixing ratio
+QT	levels	30
+QT	name	Total water mixing ratio
+DSTSFMBL	levels	1
+DSTSFMBL	name	Mobilization flux at surface
+dgnw_a02	levels	30
+dgnw_a02	name	wet dgnum, interstitial, mode 02
+dgnw_a03	levels	30
+dgnw_a03	name	wet dgnum, interstitial, mode 03
+SOAG	levels	30
+SOAG	name	SOAG concentration
+dgnw_a01	levels	30
+dgnw_a01	name	wet dgnum, interstitial, mode 01
+SNOWHICE	levels	1
+SNOWHICE	name	Water equivalent snow depth
+QC	levels	30
+QC	name	Q tendency - shallow convection LW export
+AODVIS	levels	1
+AODVIS	name	Aerosol optical depth 550 nm
+CMFMC	levels	31
+CMFMC	name	Moist shallow convection mass flux
