@@ -27,4 +27,4 @@ The following files can be found in this folder:
   files in this folder. The "USI Compression Data Analysis" file is a general
   file used for an initial look at the variables (and is therefore a bit messy)
   whereas the other files have statistics for a specific analysis question.
-* [pyStats_documentation.md]: Notes on the pyStats.py script.
+* [pyStats_documentation.md](pyStats_documentation.md): Notes on the pyStats.py script.
