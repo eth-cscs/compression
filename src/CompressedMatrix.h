@@ -99,15 +99,13 @@ public:
 
     DeviceMatrix<Scalar> X_reconstructed(Nc_, Nd_);
 
-    // This loop can be multithreaded, if all threads have a separate
+    // TODO: This loop can be multithreaded, if all threads have a separate
     // copy of X_translated
-    for(int k = 0; k < K_; k++) {
-      std::vector<int> current_cluster_indices = indices_for_cluster(k);
-      for (int m = 0; m < current_cluster_indices.size() ; m++ ) {
-        GET_COLUMN(X_reconstructed, current_cluster_indices[m]) = eigenvectors_[k]
-            * GET_COLUMN(X_reduced_[k], current_cluster_indices[m]);
-        GET_COLUMN(X_reconstructed, current_cluster_indices[m]) += GET_COLUMN(cluster_means_, k);
-      }
+    for (int i = 0; i < Nd_; i++) {
+      // minlin needs this to be done in two steps
+      GET_COLUMN(X_reconstructed, i) = eigenvectors_[cluster_indices_[i]]
+        * GET_COLUMN(X_reduced_, i);
+      GET_COLUMN(X_reconstructed, i) += GET_COLUMN(cluster_means_, cluster_indices_[i]);
     }
 
     return X_reconstructed;
@@ -120,7 +118,7 @@ private:
   /// original matrix, this contains the coefficients for the eigenvectors of
   /// its cluster. This corresponds to the projection of the original column
   /// vector into the subspace spanned by the eigenvectors.
-  std::vector< DeviceMatrix<Scalar> > X_reduced_;
+  DeviceMatrix<Scalar> X_reduced_;
   /// The mean vector for each cluster.
   DeviceMatrix<Scalar> cluster_means_;
   /// The M largest eigenvectors for each cluster.
@@ -161,7 +159,7 @@ private:
     cluster_indices_ = std::vector<int>(Nd_, 0);
     cluster_means_ = DeviceMatrix<Scalar>(Nc_, K_);
     eigenvectors_ = std::vector< DeviceMatrix<Scalar> >(K_, DeviceMatrix<Scalar>(Nc_, M_));
-    X_reduced_ = std::vector< DeviceMatrix<Scalar> >(K_, DeviceMatrix<Scalar>(M_, Nd_));
+    X_reduced_ = DeviceMatrix<Scalar>(M_, Nd_);
     
     // initialize clusters independent from number of processes
     for (int i=0; i<Nd_; i++) cluster_indices_[i] = column_ids[i]%K_;
@@ -295,26 +293,20 @@ private:
 
     // TODO: This loop can be multithreaded, if all threads have a separate
     // copy of X_translated
-    DeviceMatrix<Scalar> X_translated(Nc_, Nd_);
-    for(int k = 0; k < K_; k++) {
-      std::vector<int> current_cluster_indices = indices_for_cluster(k);
-
-      // Translate X columns with mean values and project them into subspace
-      // spanned by eigenvectors
-      for (int i = 0; i < current_cluster_indices.size(); i++ ) {
-#if defined( USE_EIGEN )      
-        X_translated.col(current_cluster_indices[i]) = X.col(current_cluster_indices[i])
-            - cluster_means_.col(k);
-        X_reduced_[k].col(current_cluster_indices[i]) = eigenvectors_[k].transpose()
-            * X_translated.col(current_cluster_indices[i]);
-#elif defined( USE_MINLIN )
-        X_translated(all, current_cluster_indices[i]) = X(all, current_cluster_indices[i])
-            - cluster_means_(all,k);
-        X_reduced_[k](all, current_cluster_indices[i]) = transpose(eigenvectors_[k])
-            * X_translated(all,current_cluster_indices[i]);
-#endif
-      }
+#if defined(USE_EIGEN)
+    for (int i = 0; i < Nd_; i++) {
+      X_reduced_.col(i) = eigenvectors_[cluster_indices_[i]].transpose()
+          * (X.col(i) - cluster_means_.col(cluster_indices_[i]));
     }
+#elif defined(USE_MINLIN)
+    DeviceVector<Scalar> tmp_vector(Nc_);
+    for (int i = 0; i < Nd_; i++) {
+      // minlin needs to do this computation in two steps
+      tmp_vector(all) = X(all, i) - cluster_means_(all, cluster_indices_[i]);
+      X_reduced_(all, i) = transpose(eigenvectors_[cluster_indices_[i]])
+          * tmp_vector;
+    }
+#endif
   }
 
   /**
