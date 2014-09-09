@@ -184,7 +184,7 @@ private:
     // eigenvectors: 1 for each k
     std::vector< DeviceMatrix<Scalar> > TT(K_, DeviceMatrix<Scalar>(Nc_, 1));
 
-    Scalar L_value_old = 1.0e19;   // Very big value
+    Scalar L_value_old = std::numeric_limits<Scalar>::max();
     Scalar L_value_new;
 
 #if defined( USE_EIGEN )
