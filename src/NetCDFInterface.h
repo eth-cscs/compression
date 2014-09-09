@@ -682,6 +682,12 @@ private:
       distributed_dims_start_[variable][i] = start_[variable][distributed_dims[i]];
       distributed_dims_count_[variable][i] = count_[variable][distributed_dims[i]];
 
+      // when a dimension is shorter than the number of processes along it,
+      // some processes don't get any data. this mostly happens if the user
+      // forgets to specify an indexed dimension.
+      if (dim_length < process_distribution[i]) {
+        if (!my_rank_) std::cerr << "WARNING: Distributed dimension has less entries than processes along dimension." << std::endl;
+      }
     }
   }
 
