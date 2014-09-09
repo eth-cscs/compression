@@ -1,21 +1,22 @@
 #!/bin/awk -f
 
 # This awk script parses the output files to create a narrow table of
-# all statistics about individual variables.
+# all statistics about individual variables. The files should be named
+# something like compression_K10_M200.out and the script should be run
+# from within the folder of the output files.
 #
-# run with: ./variable_statistics.awk FILE1.out FILE2.out ...
+# run with: ./variable_statistics.awk FILE1.out FILE2.out ... > OUTPUT
 
 BEGIN {
     OFS = "\t";
-    print "VARIABLE", "K", "M", "DIRECTION", "STATISTIC", "VALUE";
+    print "VARIABLE", "K", "M", "STATISTIC", "VALUE";
 }
 
 # read information from filename when processing first line
 FNR == 1 {
     split(FILENAME,fn,"[_.]");
-    K = substr(fn[2], 2, 10) + 0;
-    M = substr(fn[3], 2, 10) + 0;
-    direction = fn[4];
+    K = substr(fn[2], 2, 10) + 0; # convert to number with +0
+    M = substr(fn[3], 2, 10) + 0; # convert to number with +0
 }
 
 /^ Variable/ {
@@ -24,39 +25,38 @@ FNR == 1 {
 }
 
 /(original data)/ {
-    print variable, K, M, direction, "min_original", $1;
-    print variable, K, M, direction, "max_original", $2;
-    print variable, K, M, direction, "mean_original", $3;
-    print variable, K, M, direction, "std_original", $4;
+    print variable, K, M, "min_original", $1;
+    print variable, K, M, "max_original", $2;
+    print variable, K, M, "mean_original", $3;
+    print variable, K, M, "std_original", $4;
 }
 
 /(reconstructed data)/ {
-    print variable, K, M, direction, "min_reconstructed", $1;
-    print variable, K, M, direction, "max_reconstructed", $2;
-    print variable, K, M, direction, "mean_reconstructed", $3;
-    print variable, K, M, direction, "std_reconstructed", $4;
+    print variable, K, M, "min_reconstructed", $1;
+    print variable, K, M, "max_reconstructed", $2;
+    print variable, K, M, "mean_reconstructed", $3;
+    print variable, K, M, "std_reconstructed", $4;
 }
 
 /maximum error/ {
-    print variable, K, M, direction, "max_error", $3;
+    print variable, K, M, "max_error", $3;
 }
 
 /RMS error/ {
-    print variable, K, M, direction, "rms_error", $3;
+    print variable, K, M, "rms_error", $3;
 }
 
 /correlation/ {
-    print variable, K, M, direction, "correlation", $2;
+    print variable, K, M, "correlation", $2;
 }
 
 /SRR/ {
-    print variable, K, M, direction, "srr", $2;
+    print variable, K, M, "srr", $2;
 }
 
 /PrecisionBits/ {
-    print variable, K, M, direction, "precisionbits", $2;
+    print variable, K, M, "precisionbits", $2;
 }
 
 END {
 }
-
